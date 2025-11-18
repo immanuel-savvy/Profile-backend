@@ -1,5 +1,6 @@
 import {
   PENDING_PROFILES,
+  PROFILE_PASSWORDS,
   PROFILE_TYPES,
   PROFILES,
   STORE_OTP,
@@ -92,6 +93,52 @@ const verify_profile = async (req, res) => {
   res.json(response);
 };
 
-const signin = async (req, res) => {};
+const signin = async (req, res) => {
+  let { email, password, platform, type } = req.body;
 
-export { signin, signup, verify_profile };
+  let Profile_types = await PROFILE_TYPES(platform);
+  let profile_type = await Profile_types.findOne({ type });
+
+  let Profiles = await PROFILES(platform, type);
+  let profile = await Profiles().findOne({ email });
+
+  if (!profile) {
+    return res.json({
+      ok: false,
+      message: "User does not exist",
+    });
+  }
+
+  let password_store = await (
+    await PROFILE_PASSWORDS(profile_type._id)
+  ).findOne({ _id: profile._id });
+  let pass_pass = hash(password) === password_store.password;
+
+  if (!pass_pass) {
+    return res.json({
+      ok: false,
+      message: "Password invalid",
+    });
+  }
+
+  res.json({
+    ok: true,
+    message: "User login successful",
+    data: profile,
+  });
+};
+
+const get_profile = async (req, res) => {
+  let { email, platform, type } = req.body;
+
+  let Profiles = await PROFILES(platform, type);
+  let profile = await Profiles().findOne({ email });
+
+  res.json({
+    ok: true,
+    message: "Profile retrieved",
+    data: profile,
+  });
+};
+
+export { signin, signup, verify_profile, get_profile };

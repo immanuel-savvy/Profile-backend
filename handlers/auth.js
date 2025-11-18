@@ -4,14 +4,14 @@ import { hash } from "../utils/hash";
 
 const register = async (req, res) => {
   let data = req.body;
-  // email, fullname, password
+  // email, firstname, lastname, password
 
   let Pending_users = await PENDING_USERS();
   let tried = await Pending_users.findOne({ email: data.email });
 
   if (tried) {
     await Pending_users.updateOne({
-      $set: { fullname: data.fullname, password: data.password },
+      $set: { ...data },
     });
 
     return res.json({
@@ -68,6 +68,8 @@ const verify = async (req, res) => {
     await Passwords.insertOne({ _id: usr._id, password: hash(password) });
 
     response.data = usr;
+
+    // Auto generate default profile for this user aka platform
   }
 
   res.json(response);
@@ -103,4 +105,16 @@ const login = async (req, res) => {
   });
 };
 
-export { register, verify, login };
+const get_user = async (req, res) => {
+  let { email } = req.body;
+
+  let user = await (await USERS()).findOne({ email });
+
+  res.json({
+    ok: !!user,
+    message: "User retrieved",
+    data: user,
+  });
+};
+
+export { register, verify, login, get_user };

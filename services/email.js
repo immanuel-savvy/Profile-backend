@@ -44,7 +44,11 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
     body: JSON.stringify({
       email,
       template: "otp",
-      args: { otp, brand_name: profile_type.name, user_name: profile.fullname },
+      args: {
+        otp,
+        brand_name: profile_type?.name,
+        user_name: profile.fullname,
+      },
     }),
   });
   res = await res.json();
