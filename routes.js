@@ -1,10 +1,10 @@
-import { get_user, login, register, verify } from "./handlers/auth";
+import { get_user, login, register, verify } from "./handlers/auth.js";
 import {
   get_profile,
   signin,
   signup,
   verify_profile,
-} from "./handlers/profile";
+} from "./handlers/profile.js";
 
 const router = (app) => {
   // Internal Routes - no api tokens at this implementation

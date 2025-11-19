@@ -4,9 +4,9 @@ import {
   PROFILE_TYPES,
   PROFILES,
   STORE_OTP,
-} from "../ds/folders";
-import { send_profile_otp } from "../services/email";
-import { hash } from "../utils/hash";
+} from "../ds/folders.js";
+import { send_profile_otp } from "../services/email.js";
+import { hash } from "../utils/hash.js";
 
 const signup = async (req, res) => {
   let { platform, profile_id, data, password, type } = req.body;

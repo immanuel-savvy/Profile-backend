@@ -1,6 +1,12 @@
-import { PASSWORDS, PENDING_USERS, STORE_OTP, USERS } from "../ds/folders";
-import { send_otp } from "../services/email";
-import { hash } from "../utils/hash";
+import {
+  PASSWORDS,
+  PENDING_USERS,
+  PROFILE_TYPES,
+  STORE_OTP,
+  USERS,
+} from "../ds/folders.js";
+import { send_otp } from "../services/email.js";
+import { hash } from "../utils/hash.js";
 
 const register = async (req, res) => {
   let data = req.body;
@@ -70,6 +76,12 @@ const verify = async (req, res) => {
     response.data = usr;
 
     // Auto generate default profile for this user aka platform
+    await (
+      await PROFILE_TYPES(usr._id)
+    ).insertOne({
+      name: usr.fullname,
+      type: "default",
+    });
   }
 
   res.json(response);

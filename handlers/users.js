@@ -1,5 +1,5 @@
-import { PROFILE_TYPES, PROFILES } from "../ds/folders";
-import pagination from "../utils/pagination";
+import { PROFILE_TYPES, PROFILES } from "../ds/folders.js";
+import pagination from "../utils/pagination.js";
 
 const new_profile_type = async (req, res) => {
   let { user, type, data } = req.body;

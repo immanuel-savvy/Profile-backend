@@ -1,4 +1,4 @@
-import { PROFILE_TYPES, STORE_OTP } from "../ds/folders";
+import { PROFILE_TYPES, STORE_OTP } from "../ds/folders.js";
 
 let base_domain = `savvyaisolution.com`;
 let email_service = `https://email-api.${base_domain}`;
@@ -31,7 +31,7 @@ const send_otp = async (email) => {
 const send_profile_otp = async (email, { platform, profile_type, profile }) => {
   let otp = gen_otp();
 
-  let profile_type = await (
+  profile_type = await (
     await PROFILE_TYPES(platform)
   ).findOne({ type: profile_type });
 
@@ -43,7 +43,7 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
     },
     body: JSON.stringify({
       email,
-      template: "otp",
+      template: "otp:branded",
       args: {
         otp,
         brand_name: profile_type?.name,
