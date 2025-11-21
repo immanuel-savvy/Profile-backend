@@ -2,22 +2,25 @@ import {
   PASSWORDS,
   PENDING_USERS,
   PROFILE_TYPES,
+  PROFILES,
   STORE_OTP,
   USERS,
 } from "../ds/folders.js";
 import { send_otp } from "../services/email.js";
 import { hash } from "../utils/hash.js";
 
+const PROFILE_ID = "profile-savvyaisolution";
+
 const register = async (req, res) => {
   let data = req.body;
-  // email, firstname, lastname, password
+  // email, fullname, about, password
 
   let Pending_users = await PENDING_USERS();
   let tried = await Pending_users.findOne({ email: data.email });
 
   if (tried) {
     await Pending_users.updateOne({
-      $set: { ...data },
+      $set: data,
     });
 
     return res.json({
@@ -65,23 +68,16 @@ const verify = async (req, res) => {
     usr.verified = true;
     let password = usr.password;
     delete usr.password;
+    usr.created = Date.now();
 
     let Users = await USERS();
     let result = await Users.insertOne(usr);
     usr._id = result.insertedId;
 
     let Passwords = await PASSWORDS();
-    await Passwords.insertOne({ _id: usr._id, password: hash(password) });
+    await Passwords.insertOne({ _id: usr._id, key: hash(password) });
 
     response.data = usr;
-
-    // Auto generate default profile for this user aka platform
-    await (
-      await PROFILE_TYPES(usr._id)
-    ).insertOne({
-      name: usr.fullname,
-      type: "default",
-    });
   }
 
   res.json(response);
@@ -91,7 +87,7 @@ const login = async (req, res) => {
   let { email, password } = req.body;
 
   let Users = await USERS();
-  let usr = await Users().findOne({ email });
+  let usr = await Users.findOne({ email });
 
   if (!usr) {
     return res.json({
@@ -101,7 +97,7 @@ const login = async (req, res) => {
   }
 
   let password_store = await (await PASSWORDS()).findOne({ _id: usr._id });
-  let pass_pass = hash(password) === password_store.password;
+  let pass_pass = hash(password) === password_store.key;
 
   if (!pass_pass) {
     return res.json({
@@ -129,4 +125,4 @@ const get_user = async (req, res) => {
   });
 };
 
-export { register, verify, login, get_user };
+export { register, verify, login, get_user, PROFILE_ID };

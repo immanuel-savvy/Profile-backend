@@ -12,10 +12,8 @@ const PENDING_USERS = async () => {
   return fold;
 };
 
-const STORE_OTP = async (profile_type_id) => {
-  let fold = await DB().collection(
-    "Store_otp".concat(profile_type_id ? `:${profile_type_id}` : "")
-  );
+const STORE_OTP = async (profile) => {
+  let fold = await DB().collection(profile ? "Profile_otp_store" : "Store_otp");
 
   return fold;
 };
@@ -26,26 +24,26 @@ const PASSWORDS = async () => {
   return fold;
 };
 
-const PROFILE_PASSWORDS = async (profile) => {
-  let fold = await DB().collection("Profile_passwords".concat(`:${profile}`));
+const PROFILE_PASSWORDS = async () => {
+  let fold = await DB().collection("Profile_passwords");
 
   return fold;
 };
 
-const PROFILES = async (platform, type = "default") => {
-  let fold = await DB().collection(`profiles-${platform}-${type}`);
+const PROFILES = async () => {
+  let fold = await DB().collection(`profiles`);
 
   return fold;
 };
 
-const PENDING_PROFILES = async (platform, type = "default") => {
-  let fold = await DB().collection(`pending-profiles-${platform}-${type}`);
+const PENDING_PROFILES = async () => {
+  let fold = await DB().collection(`pending-profiles`);
 
   return fold;
 };
 
-const PROFILE_TYPES = async (platform) => {
-  let fold = await DB().collection(`profile_types-${platform}`);
+const PROFILE_TYPES = async () => {
+  let fold = await DB().collection(`profile_types`);
 
   return fold;
 };

@@ -2,11 +2,13 @@ import { PROFILE_TYPES, PROFILES } from "../ds/folders.js";
 import pagination from "../utils/pagination.js";
 
 const new_profile_type = async (req, res) => {
-  let { user, type, data } = req.body;
+  let { platform } = req.query;
+  let data = req.body;
+  // type, name, description
 
-  let Profile_types = await PROFILE_TYPES(user);
+  let Profile_types = await PROFILE_TYPES();
 
-  let profile = await Profile_types.findOne({ type });
+  let profile = await Profile_types.findOne({ type: data.type, platform });
   if (profile) {
     return res.json({
       ok: false,
@@ -14,7 +16,7 @@ const new_profile_type = async (req, res) => {
     });
   }
 
-  let response = await Profile_types.insertOne({ ...data, type });
+  let response = await Profile_types.insertOne({ ...data, platform });
 
   res.json({
     ok: true,
@@ -24,30 +26,32 @@ const new_profile_type = async (req, res) => {
 };
 
 const update_profile_type = async (req, res) => {
-  let { property, value, type, user } = req.body;
+  let { property, value, type, platform } = req.body;
 
-  let Profile_types = await PROFILE_TYPES(user);
+  let Profile_types = await PROFILE_TYPES();
 
   let response = await Profile_types.updateOne(
-    { type },
+    { type, platform },
     { $set: { [property]: value } }
   );
 
   res.json({
     ok: !!response.modifiedCount,
-    message: response.modifiedCount ? "Profile updated" : "Profile not found!",
+    message: !!response.modifiedCount
+      ? "Profile updated"
+      : "Profile not found!",
     data: { [property]: value },
   });
 };
 
 const get_profile_types = async (req, res) => {
-  let { user, skip } = req.body,
+  let { platform, skip } = req.body,
     limit = 20;
   skip = skip || 0;
 
-  let Profile_types = await PROFILE_TYPES(user);
+  let Profile_types = await PROFILE_TYPES();
 
-  let data = await Profile_types.find({})
+  let data = await Profile_types.find({ platform })
     .sort({ _id: -1 })
     .skip(skip)
     .limit(limit)
@@ -62,11 +66,11 @@ const get_profile_types = async (req, res) => {
 };
 
 const get_profile_type = async (req, res) => {
-  let { type, user } = req.body;
+  let { type, platform } = req.body;
 
-  let Profile_types = await PROFILE_TYPES(user);
+  let Profile_types = await PROFILE_TYPES();
 
-  let data = await Profile_types.findOne({ type });
+  let data = await Profile_types.findOne({ type, platform });
 
   res.json({
     ok: !!data,
@@ -76,13 +80,13 @@ const get_profile_type = async (req, res) => {
 };
 
 const get_profiles = async (req, res) => {
-  let { type, user, skip } = req.body,
+  let { type, platform, skip } = req.body,
     limit = 20;
   skip = skip || 0;
 
-  let Profiles = await PROFILES(user, type);
+  let Profiles = await PROFILES();
 
-  let data = await Profiles.find({})
+  let data = await Profiles.find({ platform, type })
     .sort({ _id: -1 })
     .skip(skip)
     .limit(limit)

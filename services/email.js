@@ -32,8 +32,8 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
   let otp = gen_otp();
 
   profile_type = await (
-    await PROFILE_TYPES(platform)
-  ).findOne({ type: profile_type });
+    await PROFILE_TYPES()
+  ).findOne({ type: profile_type, platform });
 
   let res = await fetch(`${email_service}/send`, {
     headers: {
@@ -54,7 +54,9 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
   res = await res.json();
 
   if (res?.data?.sent)
-    await (await STORE_OTP(profile_type._id)).insertOne({ otp, email });
+    await (
+      await STORE_OTP(true)
+    ).insertOne({ otp, email, profile_id: profile_type._id });
 
   return res;
 };

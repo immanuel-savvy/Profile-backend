@@ -12,9 +12,11 @@ const signup = async (req, res) => {
   let { platform, profile_id, data, password, type } = req.body;
   type = type || "default";
 
-  let Pending_profiles = await PENDING_PROFILES(platform, type);
+  // data-> email, firstname, lastname, bio,
 
-  let tried = await Pending_profiles.findOne({ profile_id });
+  let Pending_profiles = await PENDING_PROFILES();
+
+  let tried = await Pending_profiles.findOne({ profile_id, email: data.email });
 
   if (tried) {
     await Pending_profiles.updateOne({
@@ -51,11 +53,11 @@ const signup = async (req, res) => {
 const verify_profile = async (req, res) => {
   let { email, code, profile, platform } = req.body;
 
-  let Profile_types = await PROFILE_TYPES(platform);
+  let Profile_types = await PROFILE_TYPES();
   profile = await Profile_types.findOne({ _id: profile });
-  let Stored_otp = await STORE_OTP(profile._id);
+  let Stored_otp = await STORE_OTP(true);
 
-  let store = await Stored_otp.findOne({ email });
+  let store = await Stored_otp.findOne({ email, profile_id: profile });
 
   if (!store) {
     return res.json({
@@ -71,20 +73,22 @@ const verify_profile = async (req, res) => {
   };
 
   if (valid) {
-    let Pending_profiles = await PENDING_PROFILES(platform, type);
-    let profile_usr = await Pending_profiles.findOneAndDelete({ email });
+    let Pending_profiles = await PENDING_PROFILES();
+    let profile_usr = await Pending_profiles.findOneAndDelete({
+      email,
+      profile_id: profile,
+    });
 
     profile_usr.data.verified = true;
     let password = profile_usr.password;
-    delete profile_usr.password;
 
-    let Profiles = await PROFILES(platform, type);
-    let result = await Profiles.insertOne(profile_usr.data);
+    let Profiles = await PROFILES();
+    let result = await Profiles.insertOne({ ...profile_usr.data, profile });
 
-    let Passwords = await PROFILE_PASSWORDS(profile._id);
+    let Passwords = await PROFILE_PASSWORDS();
     await Passwords.insertOne({
       _id: result.insertedId,
-      password: hash(password),
+      key: hash(password),
     });
 
     response.data = profile_usr;
@@ -94,13 +98,10 @@ const verify_profile = async (req, res) => {
 };
 
 const signin = async (req, res) => {
-  let { email, password, platform, type } = req.body;
+  let { email, password, profile_type } = req.body;
 
-  let Profile_types = await PROFILE_TYPES(platform);
-  let profile_type = await Profile_types.findOne({ type });
-
-  let Profiles = await PROFILES(platform, type);
-  let profile = await Profiles().findOne({ email });
+  let Profiles = await PROFILES();
+  let profile = await Profiles.findOne({ email, profile: profile_type });
 
   if (!profile) {
     return res.json({
@@ -110,9 +111,9 @@ const signin = async (req, res) => {
   }
 
   let password_store = await (
-    await PROFILE_PASSWORDS(profile_type._id)
+    await PROFILE_PASSWORDS()
   ).findOne({ _id: profile._id });
-  let pass_pass = hash(password) === password_store.password;
+  let pass_pass = hash(password) === password_store.key;
 
   if (!pass_pass) {
     return res.json({
@@ -129,10 +130,10 @@ const signin = async (req, res) => {
 };
 
 const get_profile = async (req, res) => {
-  let { email, platform, type } = req.body;
+  let { email, profile_type } = req.body;
 
-  let Profiles = await PROFILES(platform, type);
-  let profile = await Profiles().findOne({ email });
+  let Profiles = await PROFILES();
+  let profile = await Profiles.findOne({ email, profile: profile_type });
 
   res.json({
     ok: true,
