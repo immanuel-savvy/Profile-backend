@@ -1,8 +1,8 @@
 import { PROFILE_TYPES, STORE_OTP } from "../ds/folders.js";
+import { PROFILE_ID } from "../handlers/auth.js";
 
 let base_domain = `savvyaisolution.com`;
 let email_service = `https://email-api.${base_domain}`;
-let token = `user-service-token`;
 
 let gen_otp = () => {
   let otp = Math.random().toString().slice(-6);
@@ -17,9 +17,13 @@ const send_otp = async (email) => {
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      Authorization: `${token}`,
     },
-    body: JSON.stringify({ email, template: "otp", args: { otp } }),
+    body: JSON.stringify({
+      email,
+      platform: PROFILE_ID,
+      template: "otp",
+      args: { otp },
+    }),
   });
   res = await res.json();
 
@@ -39,9 +43,9 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      Authorization: `${token}`,
     },
     body: JSON.stringify({
+      platform: PROFILE_ID,
       email,
       template: "otp:branded",
       args: {

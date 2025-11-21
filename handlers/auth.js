@@ -9,7 +9,8 @@ import {
 import { send_otp } from "../services/email.js";
 import { hash } from "../utils/hash.js";
 
-const PROFILE_ID = "profile-savvyaisolution";
+const PROFILE_ID = "profile-savvyaisolution",
+  PROFILE_EMAIL = "profile@savvyaisolution.com";
 
 const register = async (req, res) => {
   let data = req.body;
@@ -29,9 +30,16 @@ const register = async (req, res) => {
     });
   }
 
-  await Pending_users.insertOne(data);
+  let response;
+  if (data.email === PROFILE_EMAIL) {
+    data._id = PROFILE_ID;
 
-  let response = await send_otp(data.email);
+    response = { sent: true };
+  } else {
+    response = await send_otp(data.email);
+  }
+
+  await Pending_users.insertOne(data);
 
   res.json({
     ok: response.sent,
@@ -44,9 +52,12 @@ const register = async (req, res) => {
 const verify = async (req, res) => {
   let { email, code } = req.body;
 
-  let Stored_otp = await STORE_OTP();
+  let Stored_otp = await STORE_OTP(),
+    store;
 
-  let store = await Stored_otp.findOne({ email });
+  if (email === PROFILE_EMAIL) {
+    store = { otp: process.env.PROFILE_OTP };
+  } else store = await Stored_otp.findOne({ email });
 
   if (!store) {
     return res.json({
