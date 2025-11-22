@@ -14,6 +14,7 @@ const send_otp = async (email, fullname) => {
   let otp = gen_otp();
 
   let res = await fetch(`${email_service}/send_email`, {
+    method: "POST",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
