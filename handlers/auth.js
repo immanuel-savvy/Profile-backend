@@ -8,14 +8,20 @@ const PROFILE_ID = "profile-savvyaisolution",
 const register = async (req, res) => {
   let data = req.body;
   // email, fullname, about, password
+  console.log(data, "here");
 
   let Pending_users = await PENDING_USERS();
   let tried = await Pending_users.findOne({ email: data.email });
 
   if (tried) {
-    await Pending_users.updateOne({
-      $set: data,
-    });
+    await send_otp(data.email, data.fullname);
+    console.log(data);
+    await Pending_users.updateOne(
+      { _id: tried._id },
+      {
+        $set: data,
+      }
+    );
 
     return res.json({
       ok: true,
