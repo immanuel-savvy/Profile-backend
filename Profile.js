@@ -22,30 +22,6 @@ app.use(bodyParser.urlencoded({ extended: true, limit: "100mb" }));
 app.use(bodyParser.json({ limit: "100mb" }));
 
 app.get("/", async (req, res) => {
-  let Users = await USERS();
-  if (!(await Users.findOne({ _id: PROFILE_ID }))) {
-    await Users.insertOne({
-      _id: PROFILE_ID,
-      email: "profile@savvyaisolution.com",
-      firstname: "Profile",
-      lastname: "",
-      verified: true,
-    });
-
-    await (
-      await PROFILE_TYPES(PROFILE_ID)
-    ).insertOne({
-      name: "Profile",
-      type: "default",
-    });
-
-    let Passwords = await PASSWORDS();
-    await Passwords.insertOne({
-      _id: PROFILE_ID,
-      password: hash(process.env.PROFILE_PASSWORD),
-    });
-  }
-
   res.send("Welcome to Profile API");
 });
 
