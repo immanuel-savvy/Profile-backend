@@ -21,7 +21,7 @@ const new_profile_type = async (req, res) => {
   res.json({
     ok: true,
     message: "Profile Type Added!",
-    data: { _id: response.insertedId, type },
+    data: { _id: response.insertedId, type: data.type },
   });
 };
 
