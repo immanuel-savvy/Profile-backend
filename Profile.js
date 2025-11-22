@@ -11,8 +11,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 import router from "./routes.js";
-import { PASSWORDS, PROFILE_TYPES, USERS } from "./ds/folders.js";
-import { PROFILE_ID } from "./handlers/auth.js";
 
 const app = express();
 

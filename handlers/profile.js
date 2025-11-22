@@ -98,10 +98,10 @@ const verify_profile = async (req, res) => {
 };
 
 const signin = async (req, res) => {
-  let { email, password, profile_type } = req.body;
+  let { email, password, profile: profile_id } = req.body;
 
   let Profiles = await PROFILES();
-  let profile = await Profiles.findOne({ email, profile: profile_type });
+  let profile = await Profiles.findOne({ email, profile: profile_id });
 
   if (!profile) {
     return res.json({
