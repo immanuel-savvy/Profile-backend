@@ -9,7 +9,7 @@ import { send_profile_otp } from "../services/email.js";
 import { hash } from "../utils/hash.js";
 
 const signup = async (req, res) => {
-  let { platform, profile_id, data, password, type } = req.body;
+  let { platform, profile_id, data, password, em } = req.body;
   type = type || "default";
 
   // data-> email, firstname, lastname, bio,
@@ -51,7 +51,7 @@ const signup = async (req, res) => {
 };
 
 const verify_profile = async (req, res) => {
-  let { email, code, profile, platform } = req.body;
+  let { email, code, profile } = req.body;
 
   let Profile_types = await PROFILE_TYPES();
   profile = await Profile_types.findOne({ _id: profile });

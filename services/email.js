@@ -10,7 +10,7 @@ let gen_otp = () => {
   return otp;
 };
 
-const send_otp = async (email) => {
+const send_otp = async (email, fullname) => {
   let otp = gen_otp();
 
   let res = await fetch(`${email_service}/send_email`, {
@@ -21,8 +21,13 @@ const send_otp = async (email) => {
     body: JSON.stringify({
       email,
       platform: PROFILE_ID,
-      template: "otp",
-      args: { otp },
+      template: "otp:branded",
+      args: {
+        otp_code: otp,
+        expiry_time: "5 mins",
+        brand_name: "SavvyAI Profile",
+        user_name: fullname,
+      },
     }),
   });
   res = await res.json();
@@ -49,7 +54,8 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
       email,
       template: "otp:branded",
       args: {
-        otp,
+        otp_code: otp,
+        expiry_time: "5 mins",
         brand_name: profile_type?.name,
         user_name: profile.fullname,
       },

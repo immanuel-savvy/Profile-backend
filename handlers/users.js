@@ -80,13 +80,13 @@ const get_profile_type = async (req, res) => {
 };
 
 const get_profiles = async (req, res) => {
-  let { type, platform, skip } = req.body,
+  let { profile, skip } = req.body,
     limit = 20;
   skip = skip || 0;
 
   let Profiles = await PROFILES();
 
-  let data = await Profiles.find({ platform, type })
+  let data = await Profiles.find({ profile })
     .sort({ _id: -1 })
     .skip(skip)
     .limit(limit)

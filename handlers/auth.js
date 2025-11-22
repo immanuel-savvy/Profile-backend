@@ -1,11 +1,4 @@
-import {
-  PASSWORDS,
-  PENDING_USERS,
-  PROFILE_TYPES,
-  PROFILES,
-  STORE_OTP,
-  USERS,
-} from "../ds/folders.js";
+import { PASSWORDS, PENDING_USERS, STORE_OTP, USERS } from "../ds/folders.js";
 import { send_otp } from "../services/email.js";
 import { hash } from "../utils/hash.js";
 
@@ -36,7 +29,7 @@ const register = async (req, res) => {
 
     response = { sent: true };
   } else {
-    response = await send_otp(data.email);
+    response = await send_otp(data.email, data.fullname);
   }
 
   await Pending_users.insertOne(data);
