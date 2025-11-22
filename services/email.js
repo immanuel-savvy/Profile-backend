@@ -24,7 +24,7 @@ const send_otp = async (email, fullname) => {
       template: "otp:branded",
       args: {
         otp_code: otp,
-        expiry_time: "5 mins",
+        expiry_time: "5",
         brand_name: "SavvyAI Profile",
         user_name: fullname,
       },
@@ -55,7 +55,7 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
       template: "otp:branded",
       args: {
         otp_code: otp,
-        expiry_time: "5 mins",
+        expiry_time: "5",
         brand_name: profile_type?.name,
         user_name: profile.fullname,
       },
