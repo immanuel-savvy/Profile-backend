@@ -14,7 +14,7 @@ const register = async (req, res) => {
   let tried = await Pending_users.findOne({ email: data.email });
 
   if (tried) {
-    await send_otp(data.email, data.fullname);
+    console.log(await send_otp(data.email, data.fullname));
     console.log(data);
     await Pending_users.updateOne(
       { _id: tried._id },

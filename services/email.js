@@ -21,7 +21,7 @@ const send_otp = async (email, fullname) => {
     },
     body: JSON.stringify({
       email,
-      platform: PROFILE_ID,
+      user: PROFILE_ID,
       template: "otp:branded",
       args: {
         otp_code: otp,
@@ -51,7 +51,7 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      platform: PROFILE_ID,
+      user: PROFILE_ID,
       email,
       template: "otp:branded",
       args: {
