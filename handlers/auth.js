@@ -1,5 +1,5 @@
 import { PASSWORDS, PENDING_USERS, STORE_OTP, USERS } from "../ds/folders.js";
-import { send_otp } from "../services/email.js";
+import { base_domain, FROM, send_mail, send_otp } from "../services/email.js";
 import { hash } from "../utils/hash.js";
 
 const PROFILE_ID = "profile-savvyaisolution",
@@ -7,15 +7,13 @@ const PROFILE_ID = "profile-savvyaisolution",
 
 const register = async (req, res) => {
   let data = req.body;
-  // email, fullname, about, password
-  console.log(data, "here");
+  // email, fullname, about, password,
 
   let Pending_users = await PENDING_USERS();
   let tried = await Pending_users.findOne({ email: data.email });
 
   if (tried) {
-    console.log(await send_otp(data.email, data.fullname));
-    console.log(data);
+    await send_otp(data.email, data.fullname);
     await Pending_users.updateOne(
       { _id: tried._id },
       {
@@ -84,6 +82,17 @@ const verify = async (req, res) => {
     let result = await Users.insertOne(usr);
     usr._id = result.insertedId;
 
+    await send_mail(
+      usr.email,
+      {
+        brand_name: FROM,
+        user_name: usr.fullname,
+        support_email: `profile-support@savvyaisolution.com`,
+        dashboard_link: `https://profile.${base_domain}/dashboard?platform_token=${usr._id}`,
+      },
+      "welcome:branded-support"
+    );
+
     let Passwords = await PASSWORDS();
     await Passwords.insertOne({ _id: usr._id, key: hash(password) });
 
@@ -124,7 +133,7 @@ const login = async (req, res) => {
 };
 
 const get_user = async (req, res) => {
-  let { email } = req.body;
+  let { email, token } = req.body;
 
   let user = await (await USERS()).findOne({ email });
 

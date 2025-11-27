@@ -9,8 +9,7 @@ import { send_profile_otp } from "../services/email.js";
 import { hash } from "../utils/hash.js";
 
 const signup = async (req, res) => {
-  let { platform, profile_id, data, password, em } = req.body;
-  type = type || "default";
+  let { platform, profile_id, data, password } = req.body;
 
   // data-> email, firstname, lastname, bio,
 
@@ -97,6 +96,24 @@ const verify_profile = async (req, res) => {
   res.json(response);
 };
 
+const update_profile_password = async (req, res) => {
+  let { profile, password } = req.body;
+
+  let Passwords = await PROFILE_PASSWORDS();
+
+  let result = await Passwords.updateOne(
+    { _id: profile },
+    { $set: { key: hash(password) } }
+  );
+
+  res.json({
+    ok: !!result.modifiedCount,
+    message: result.modifiedCount
+      ? "Password Updated"
+      : "Password update failed",
+  });
+};
+
 const signin = async (req, res) => {
   let { email, password, profile: profile_id } = req.body;
 
@@ -130,7 +147,7 @@ const signin = async (req, res) => {
 };
 
 const get_profile = async (req, res) => {
-  let { email, profile_type } = req.body;
+  let { email, profile_type, token } = req.body;
 
   let Profiles = await PROFILES();
   let profile = await Profiles.findOne({ email, profile: profile_type });
@@ -142,4 +159,4 @@ const get_profile = async (req, res) => {
   });
 };
 
-export { signin, signup, verify_profile, get_profile };
+export { signin, signup, verify_profile, get_profile, update_profile_password };
