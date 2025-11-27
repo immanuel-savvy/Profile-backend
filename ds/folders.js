@@ -48,10 +48,17 @@ const PROFILE_TYPES = async () => {
   return fold;
 };
 
+const SETTINGS = async () => {
+  let fold = await DB().collection("settings");
+
+  return fold;
+};
+
 export {
   USERS,
   PENDING_USERS,
   STORE_OTP,
+  SETTINGS,
   PASSWORDS,
   PROFILES,
   PROFILE_TYPES,

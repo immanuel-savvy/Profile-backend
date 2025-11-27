@@ -1,4 +1,4 @@
-import { PROFILE_TYPES, PROFILES } from "../ds/folders.js";
+import { PROFILE_TYPES, PROFILES, SETTINGS } from "../ds/folders.js";
 import pagination from "../utils/pagination.js";
 
 const new_profile_type = async (req, res) => {
@@ -100,7 +100,35 @@ const get_profiles = async (req, res) => {
   });
 };
 
+const settings = async (req, res) => {
+  let { user, setting } = req.body;
+
+  let result = await (
+    await SETTINGS()
+  ).updateOne({ _id: user }, { $set: setting }, { upsert: true });
+
+  res.json({
+    ok: !!(result.modifiedCount || result.upsertedCount),
+    message: result.modifiedCount || result.upsertedCount ? "Done" : "Failed",
+  });
+};
+// ...existing code...
+
+const get_settings = async (req, res) => {
+  let { user } = req.body;
+
+  let setting = await (await SETTINGS()).findOne({ _id: user });
+
+  res.json({
+    ok: !!setting,
+    message: setting ? "Setting retrieved" : "Not found",
+    data: setting,
+  });
+};
+
 export {
+  settings,
+  get_settings,
   new_profile_type,
   update_profile_type,
   get_profile_type,

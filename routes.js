@@ -11,7 +11,9 @@ import {
   get_profile_type,
   get_profile_types,
   get_profiles,
+  get_settings,
   new_profile_type,
+  settings,
   update_profile_type,
 } from "./handlers/users.js";
 
@@ -35,6 +37,9 @@ const router = (app) => {
   app.post("/get_profile_type", get_profile_type);
   app.post("/get_profile_types", get_profile_types);
   app.post("/get_profiles", get_profiles);
+  // Settings
+  app.post("/settings", settings);
+  app.post("/get_settings", get_settings);
 
   // Dashboard
   app.post("/user_profiles", user_profiles);
