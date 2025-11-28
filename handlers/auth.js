@@ -81,14 +81,14 @@ const verify = async (req, res) => {
     let Pending_users = await PENDING_USERS();
     let deleted = await Pending_users.findOneAndDelete({ email });
 
-    if (!deleted || !deleted.value) {
+    let usr = deleted?.value ?? deleted;
+    if (!usr) {
       return res.json({
         ok: false,
         message: "Pending user not found",
       });
     }
 
-    let usr = deleted.value;
     usr.verified = true;
     let password = usr.password;
     delete usr.password;

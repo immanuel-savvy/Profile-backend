@@ -85,14 +85,14 @@ const verify_profile = async (req, res) => {
       profile_id: profile,
     });
 
-    if (!deleted || !deleted.value) {
+    let profile_usr = deleted?.value ?? deleted;
+    if (!profile_usr) {
       return res.json({
         ok: false,
         message: "Pending profile not found",
       });
     }
 
-    let profile_usr = deleted.value;
     profile_usr.data.verified = true;
     let password = profile_usr.password;
 
