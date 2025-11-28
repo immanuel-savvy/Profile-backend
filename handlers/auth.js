@@ -1,6 +1,7 @@
 import { PASSWORDS, PENDING_USERS, STORE_OTP, USERS } from "../ds/folders.js";
 import { base_domain, FROM, send_mail, send_otp } from "../services/email.js";
 import { hash } from "../utils/hash.js";
+import crypto from "crypto";
 
 const PROFILE_ID = "profile-savvyaisolution",
   PROFILE_EMAIL = "profile@savvyaisolution.com";
@@ -29,9 +30,10 @@ const register = async (req, res) => {
   }
 
   let response;
-  if (data.email === PROFILE_EMAIL) {
-    data._id = PROFILE_ID;
+  const pendingId = crypto.randomUUID();
+  data._id = data.email === PROFILE_EMAIL ? PROFILE_ID : pendingId;
 
+  if (data.email === PROFILE_EMAIL) {
     response = { sent: true };
   } else {
     response = await send_otp(data.email, data.fullname);
@@ -91,12 +93,15 @@ const verify = async (req, res) => {
 
     usr.verified = true;
     let password = usr.password;
+    const userId = usr._id;
     delete usr.password;
     usr.created = Date.now();
 
     let Users = await USERS();
-    let result = await Users.insertOne(usr);
-    usr._id = result.insertedId;
+    await Users.insertOne({
+      _id: userId,
+      ...usr,
+    });
 
     await send_mail(
       usr.email,
@@ -104,15 +109,15 @@ const verify = async (req, res) => {
         brand_name: FROM,
         user_name: usr.fullname,
         support_email: `profile-support@savvyaisolution.com`,
-        dashboard_link: `https://profile.${base_domain}/dashboard?platform_token=${usr._id}`,
+        dashboard_link: `https://profile.${base_domain}/dashboard?platform_token=${userId}`,
       },
       "welcome:branded-support"
     );
 
     let Passwords = await PASSWORDS();
-    await Passwords.insertOne({ _id: usr._id, key: password });
+    await Passwords.insertOne({ _id: userId, key: password });
 
-    response.data = usr;
+    response.data = { ...usr, _id: userId };
   }
 
   res.json(response);

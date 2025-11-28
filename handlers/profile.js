@@ -9,10 +9,12 @@ import {
 } from "../ds/folders.js";
 import { send_mail, send_profile_otp } from "../services/email.js";
 import { hash } from "../utils/hash.js";
+import crypto from "crypto";
 
 const signup = async (req, res) => {
   let { platform, profile_id, data, password } = req.body;
 
+  console.log(platform, profile_id, data, password);
   // data-> email, firstname, lastname, bio,
 
   let Pending_profiles = await PENDING_PROFILES();
@@ -33,7 +35,9 @@ const signup = async (req, res) => {
     });
   }
 
+  const pendingId = crypto.randomUUID();
   await Pending_profiles.insertOne({
+    _id: pendingId,
     profile_id,
     password,
     email: data.email,
@@ -96,8 +100,13 @@ const verify_profile = async (req, res) => {
     profile_usr.data.verified = true;
     let password = profile_usr.password;
 
+    const profileId = crypto.randomUUID();
     let Profiles = await PROFILES();
-    let result = await Profiles.insertOne({ ...profile_usr.data, profile });
+    await Profiles.insertOne({
+      _id: profileId,
+      ...profile_usr.data,
+      profile,
+    });
 
     let platform = await (
       await USERS()
@@ -121,11 +130,11 @@ const verify_profile = async (req, res) => {
 
     let Passwords = await PROFILE_PASSWORDS();
     await Passwords.insertOne({
-      _id: result.insertedId,
+      _id: profileId,
       key: hash(password),
     });
 
-    response.data = { ...profile_usr.data, _id: result.insertedId };
+    response.data = { ...profile_usr.data, _id: profileId };
   }
 
   res.json(response);

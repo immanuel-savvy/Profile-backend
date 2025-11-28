@@ -1,5 +1,6 @@
 import { PROFILE_TYPES, PROFILES, SETTINGS } from "../ds/folders.js";
 import pagination from "../utils/pagination.js";
+import crypto from "crypto";
 
 const new_profile_type = async (req, res) => {
   let { platform } = req.query;
@@ -16,12 +17,17 @@ const new_profile_type = async (req, res) => {
     });
   }
 
-  let response = await Profile_types.insertOne({ ...data, platform });
+  const profileTypeId = crypto.randomUUID();
+  await Profile_types.insertOne({
+    _id: profileTypeId,
+    ...data,
+    platform,
+  });
 
   res.json({
     ok: true,
     message: "Profile Type Added!",
-    data: { _id: response.insertedId, type: data.type },
+    data: { _id: profileTypeId, type: data.type },
   });
 };
 
@@ -64,11 +70,13 @@ const get_profile_types = async (req, res) => {
     .limit(limit)
     .toArray();
 
+  let total = await Profile_types.countDocuments({ platform });
+
   res.json({
     ok: true,
     message: "Profile types retrieved",
     data,
-    pagination: pagination(Profile_types, limit, skip),
+    pagination: pagination(total, limit, skip),
   });
 };
 
@@ -99,11 +107,13 @@ const get_profiles = async (req, res) => {
     .limit(limit)
     .toArray();
 
+  let total = await Profiles.countDocuments({ profile });
+
   res.json({
     ok: true,
     message: "Profile retrieved",
     data,
-    pagination: pagination(Profiles, limit, skip),
+    pagination: pagination(total, limit, skip),
   });
 };
 

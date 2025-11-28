@@ -80,6 +80,7 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
   profile_type = await (await PROFILE_TYPES()).findOne({ _id: profile_type });
 
   let platfom = await (await USERS()).findOne({ _id: platform });
+  console.log(platfom, platform, profile_type);
 
   let res = await fetch(`${email_service}/send`, {
     method: "POST",
