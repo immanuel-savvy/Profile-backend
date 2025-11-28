@@ -1,4 +1,4 @@
-import { PROFILE_TYPES, SETTINGS, STORE_OTP } from "../ds/folders.js";
+import { PROFILE_TYPES, SETTINGS, STORE_OTP, USERS } from "../ds/folders.js";
 import { PROFILE_ID } from "../handlers/auth.js";
 
 let base_domain = `savvyaisolution.com`;
@@ -71,9 +71,9 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
   let otp_expiry = settings?.otp_expiry?.toString() || "5";
   let otp = gen_otp(settings?.otp_length, otp_expiry);
 
-  profile_type = await (
-    await PROFILE_TYPES()
-  ).findOne({ type: profile_type, platform });
+  profile_type = await (await PROFILE_TYPES()).findOne({ _id: profile_type });
+
+  let platfom = await (await USERS()).findOne({ _id: platform });
 
   let res = await fetch(`${email_service}/send`, {
     headers: {
@@ -83,12 +83,15 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
     body: JSON.stringify({
       user: PROFILE_ID,
       email,
+      from: platfom.fullname,
       template: "otp:branded",
       args: {
         otp_code: otp,
         expiry_time: otp_expiry,
         brand_name: profile_type?.name,
-        user_name: profile.fullname,
+        user_name: profile.firstname
+          ? `${profile.firstname} $${profile.lastname}`
+          : "There",
       },
     }),
   });

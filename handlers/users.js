@@ -112,7 +112,6 @@ const settings = async (req, res) => {
     message: result.modifiedCount || result.upsertedCount ? "Done" : "Failed",
   });
 };
-// ...existing code...
 
 const get_settings = async (req, res) => {
   let { user } = req.body;
