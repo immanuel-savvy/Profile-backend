@@ -77,14 +77,22 @@ const verify_profile = async (req, res) => {
   };
 
   if (valid) {
+    await Stored_otp.deleteOne({ email, profile_id: profile });
+
     let Pending_profiles = await PENDING_PROFILES();
     let deleted = await Pending_profiles.findOneAndDelete({
       email,
       profile_id: profile,
     });
 
-    let profile_usr = deleted?.value;
+    if (!deleted || !deleted.value) {
+      return res.json({
+        ok: false,
+        message: "Pending profile not found",
+      });
+    }
 
+    let profile_usr = deleted.value;
     profile_usr.data.verified = true;
     let password = profile_usr.password;
 
@@ -117,7 +125,7 @@ const verify_profile = async (req, res) => {
       key: hash(password),
     });
 
-    response.data = profile_usr;
+    response.data = { ...profile_usr.data, _id: result.insertedId };
   }
 
   res.json(response);
@@ -135,10 +143,11 @@ const update_profile_password = async (req, res) => {
   );
 
   res.json({
-    ok: !!result.modifiedCount,
-    message: result.modifiedCount
-      ? "Password Updated"
-      : "Password update failed",
+    ok: !!(result.modifiedCount || result.upsertedCount),
+    message:
+      result.modifiedCount || result.upsertedCount
+        ? "Password Updated"
+        : "Password update failed",
   });
 };
 

@@ -20,13 +20,13 @@ const send_mail = async (email, args, template, from) => {
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: {
+    body: JSON.stringify({
       email,
       user: PROFILE_ID,
       template,
       from: from || FROM,
       args,
-    },
+    }),
   });
   res = await res.json();
 
@@ -45,6 +45,7 @@ const send_otp = async (email, fullname) => {
     body: JSON.stringify({
       email,
       user: PROFILE_ID,
+      from: FROM,
       template: "otp:branded",
       args: {
         otp_code: otp,
@@ -57,7 +58,12 @@ const send_otp = async (email, fullname) => {
   res = await res.json();
 
   if (res?.data?.sent) {
-    await (await STORE_OTP()).insertOne({ otp, email });
+    const StoreOtp = await STORE_OTP();
+    await StoreOtp.updateOne(
+      { email },
+      { $set: { otp, updated: Date.now() } },
+      { upsert: true }
+    );
 
     res = res.data;
   }
@@ -69,13 +75,14 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
   let settings = await (await SETTINGS()).findOne({ _id: platform });
 
   let otp_expiry = settings?.otp_expiry?.toString() || "5";
-  let otp = gen_otp(settings?.otp_length, otp_expiry);
+  let otp = gen_otp(settings?.otp_length);
 
   profile_type = await (await PROFILE_TYPES()).findOne({ _id: profile_type });
 
   let platfom = await (await USERS()).findOne({ _id: platform });
 
   let res = await fetch(`${email_service}/send`, {
+    method: "POST",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
@@ -90,17 +97,23 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
         expiry_time: otp_expiry,
         brand_name: profile_type?.name,
         user_name: profile.firstname
-          ? `${profile.firstname} $${profile.lastname}`
+          ? `${profile.firstname} ${profile.lastname}`
           : "There",
       },
     }),
   });
   res = await res.json();
 
-  if (res?.data?.sent)
-    await (
-      await STORE_OTP(true)
-    ).insertOne({ otp, email, otp_expiry, profile_id: profile_type._id });
+  if (res?.data?.sent) {
+    const StoreOtp = await STORE_OTP(true);
+    await StoreOtp.updateOne(
+      { email, profile_id: profile_type._id },
+      { $set: { otp, otp_expiry, updated: Date.now() } },
+      { upsert: true }
+    );
+
+    res = res.data;
+  }
 
   return res;
 };

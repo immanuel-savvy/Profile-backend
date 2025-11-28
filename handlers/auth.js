@@ -8,6 +8,7 @@ const PROFILE_ID = "profile-savvyaisolution",
 const register = async (req, res) => {
   let data = req.body;
   // email, fullname, about, password,
+  data.password = hash(data.password);
 
   let Pending_users = await PENDING_USERS();
   let tried = await Pending_users.findOne({ email: data.email });
@@ -49,12 +50,14 @@ const register = async (req, res) => {
 const verify = async (req, res) => {
   let { email, code } = req.body;
 
-  let Stored_otp = await STORE_OTP(),
-    store;
+  let Stored_otp = await STORE_OTP();
+  let store;
 
   if (email === PROFILE_EMAIL) {
     store = { otp: process.env.PROFILE_OTP };
-  } else store = await Stored_otp.findOne({ email });
+  } else {
+    store = await Stored_otp.findOne({ email });
+  }
 
   if (!store) {
     return res.json({
@@ -70,9 +73,22 @@ const verify = async (req, res) => {
   };
 
   if (valid) {
-    let Pending_users = await PENDING_USERS();
-    let usr = await Pending_users.findOneAndDelete({ email });
+    // delete the OTP record after successful verification (for non-profile email)
+    if (email !== PROFILE_EMAIL) {
+      await Stored_otp.deleteOne({ email });
+    }
 
+    let Pending_users = await PENDING_USERS();
+    let deleted = await Pending_users.findOneAndDelete({ email });
+
+    if (!deleted || !deleted.value) {
+      return res.json({
+        ok: false,
+        message: "Pending user not found",
+      });
+    }
+
+    let usr = deleted.value;
     usr.verified = true;
     let password = usr.password;
     delete usr.password;
@@ -94,7 +110,7 @@ const verify = async (req, res) => {
     );
 
     let Passwords = await PASSWORDS();
-    await Passwords.insertOne({ _id: usr._id, key: hash(password) });
+    await Passwords.insertOne({ _id: usr._id, key: password });
 
     response.data = usr;
   }
@@ -115,7 +131,22 @@ const login = async (req, res) => {
     });
   }
 
+  if (!usr.verified) {
+    return res.json({
+      ok: false,
+      message: "User not verified",
+    });
+  }
+
   let password_store = await (await PASSWORDS()).findOne({ _id: usr._id });
+
+  if (!password_store) {
+    return res.json({
+      ok: false,
+      message: "Password not set",
+    });
+  }
+
   let pass_pass = hash(password) === password_store.key;
 
   if (!pass_pass) {
@@ -139,7 +170,7 @@ const get_user = async (req, res) => {
 
   res.json({
     ok: !!user,
-    message: "User retrieved",
+    message: user ? "User retrieved" : "User not found",
     data: user,
   });
 };

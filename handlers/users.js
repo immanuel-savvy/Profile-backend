@@ -36,10 +36,17 @@ const update_profile_type = async (req, res) => {
   );
 
   res.json({
-    ok: !!response.modifiedCount,
-    message: !!response.modifiedCount
-      ? "Profile updated"
-      : "Profile not found!",
+    ok: !!(
+      response.modifiedCount ||
+      response.upsertedCount ||
+      response.matchedCount
+    ),
+    message:
+      response.modifiedCount || response.upsertedCount
+        ? "Profile updated"
+        : response.matchedCount
+        ? "No changes"
+        : "Profile not found!",
     data: { [property]: value },
   });
 };
