@@ -125,7 +125,11 @@ const verify_profile = async (req, res) => {
     await send_mail(
       profile_usr.data.email,
       args,
-      args.user_name ? "welcome:branded-support" : "welcome:branded-no-username"
+      setting?.welcome_email ||
+        (args.user_name
+          ? "welcome:branded-support"
+          : "welcome:branded-no-username"),
+      platform.fullname
     );
 
     let Passwords = await PROFILE_PASSWORDS();
