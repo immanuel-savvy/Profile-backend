@@ -2,6 +2,7 @@ import { get_user, login, register, verify } from "./handlers/auth.js";
 import { user_profiles } from "./handlers/dashboard.js";
 import {
   get_profile,
+  resend_profile_otp,
   signin,
   signup,
   update_profile_password,
@@ -28,6 +29,7 @@ const router = (app) => {
   app.post("/signin", signin);
   app.post("/signup", signup);
   app.post("/verify_profile", verify_profile);
+  app.post("/resend_profile_otp", resend_profile_otp);
   app.post("/get_profile", get_profile);
   app.post("/update_profile_password", update_profile_password);
 

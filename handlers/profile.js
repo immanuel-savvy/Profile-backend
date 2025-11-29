@@ -7,19 +7,30 @@ import {
   STORE_OTP,
   USERS,
 } from "../ds/folders.js";
-import { send_mail, send_profile_otp } from "../services/email.js";
+import {
+  send_mail,
+  send_message_otp,
+  send_profile_otp,
+} from "../services/email.js";
 import { hash } from "../utils/hash.js";
 import crypto from "crypto";
 
+const VERIFICATION_MEANS = ["email", "phone"];
+
 const signup = async (req, res) => {
-  let { platform, profile_id, data, password } = req.body;
+  let { platform, profile_id, data, password, verification_means } = req.body;
+  verification_means = VERIFICATION_MEANS[verification_means || 0];
 
   console.log(platform, profile_id, data, password);
-  // data-> email, firstname, lastname, bio,
+  // data-> email, firstname, lastname, bio, ... (phone)
 
   let Pending_profiles = await PENDING_PROFILES();
 
-  let tried = await Pending_profiles.findOne({ profile_id, email: data.email });
+  let tried = await Pending_profiles.findOne({
+    profile_id,
+    [verification_means]:
+      verification_means === "email" ? data.email : data.phone,
+  });
 
   if (tried) {
     await Pending_profiles.updateOne(
@@ -36,36 +47,54 @@ const signup = async (req, res) => {
   }
 
   const pendingId = crypto.randomUUID();
-  await Pending_profiles.insertOne({
+  let obj = {
     _id: pendingId,
     profile_id,
     password,
-    email: data.email,
     data,
-  });
+    verification_means,
+  };
+  if (verification_means === "email") {
+    obj.email = data.email;
+  } else if (verification_means === "phone") {
+    obj.phone = data.phone;
+  }
+  await Pending_profiles.insertOne(obj);
 
-  let response = await send_profile_otp(data.email, {
-    platform,
-    profile_type: profile_id,
-    profile: data,
-  });
+  let response;
+
+  if (verification_means === "phone") {
+    response = await send_message_otp(data.phone, {
+      platform,
+      profile_type: profile_id,
+    });
+  } else
+    response = await send_profile_otp(data.email, {
+      platform,
+      profile_type: profile_id,
+      profile: data,
+    });
 
   res.json({
-    ok: response.sent,
-    message: response.sent
-      ? `Verification code have been sent to email`
+    ok: response?.sent,
+    message: response?.sent
+      ? `Verification code have been sent to ${verification_means}`
       : `Err, Something went wrong`,
   });
 };
 
 const verify_profile = async (req, res) => {
-  let { email, code, profile } = req.body;
+  let { email, code, phone, profile, verification_means } = req.body;
+  verification_means = VERIFICATION_MEANS[verification_means || 0];
 
   let Profile_types = await PROFILE_TYPES();
   let profile_type = await Profile_types.findOne({ _id: profile });
   let Stored_otp = await STORE_OTP(true);
 
-  let store = await Stored_otp.findOne({ email, profile_id: profile });
+  let store = await Stored_otp.findOne({
+    [verification_means]: verification_means === "email" ? email : phone,
+    profile_id: profile,
+  });
 
   if (!store) {
     return res.json({
@@ -81,11 +110,14 @@ const verify_profile = async (req, res) => {
   };
 
   if (valid) {
-    await Stored_otp.deleteOne({ email, profile_id: profile });
+    await Stored_otp.deleteOne({
+      [verification_means]: verification_means === "email" ? email : phone,
+      profile_id: profile,
+    });
 
     let Pending_profiles = await PENDING_PROFILES();
     let deleted = await Pending_profiles.findOneAndDelete({
-      email,
+      [verification_means]: verification_means === "email" ? email : phone,
       profile_id: profile,
     });
 
@@ -97,7 +129,7 @@ const verify_profile = async (req, res) => {
       });
     }
 
-    profile_usr.data.verified = true;
+    profile_usr.data.verified = [verification_means];
     let password = profile_usr.password;
 
     const profileId = crypto.randomUUID();
@@ -108,29 +140,32 @@ const verify_profile = async (req, res) => {
       profile,
     });
 
-    let platform = await (
-      await USERS()
-    ).findOne({ _id: profile_type.platform });
+    // Send welcome message to email.
+    if (profile_usr.data.email) {
+      let platform = await (
+        await USERS()
+      ).findOne({ _id: profile_type.platform });
 
-    let args = {
-      brand_name: platform.fullname,
-    };
+      let args = {
+        brand_name: platform.fullname,
+      };
 
-    if (profile_usr.data.firstname) {
-      args.user_name =
-        `${profile_usr.data.firstname} ${profile_usr.data.lastname}`.trim();
+      if (profile_usr.data.firstname) {
+        args.user_name =
+          `${profile_usr.data.firstname} ${profile_usr.data.lastname}`.trim();
+      }
+      let setting = await (await SETTINGS()).findOne({ _id: platform._id });
+      args.support_email = setting?.support_email || platform.email;
+      await send_mail(
+        profile_usr.data.email,
+        args,
+        setting?.welcome_email ||
+          (args.user_name
+            ? "welcome:branded-support"
+            : "welcome:branded-no-username"),
+        platform.fullname
+      );
     }
-    let setting = await (await SETTINGS()).findOne({ _id: platform._id });
-    args.support_email = setting?.support_email || platform.email;
-    await send_mail(
-      profile_usr.data.email,
-      args,
-      setting?.welcome_email ||
-        (args.user_name
-          ? "welcome:branded-support"
-          : "welcome:branded-no-username"),
-      platform.fullname
-    );
 
     let Passwords = await PROFILE_PASSWORDS();
     await Passwords.insertOne({
@@ -214,4 +249,52 @@ const get_profile = async (req, res) => {
   });
 };
 
-export { signin, signup, verify_profile, get_profile, update_profile_password };
+const resend_profile_otp = async (req, res) => {
+  let { email, phone, platform, profile, verification_means } = req.body;
+
+  verification_means = VERIFICATION_MEANS[verification_means || 0];
+
+  let Pending_profiles = await PENDING_PROFILES();
+
+  let tried = await Pending_profiles.findOne({
+    profile_id: profile,
+    [verification_means]: verification_means === "email" ? email : phone,
+  });
+
+  if (!tried) {
+    return res.json({
+      ok: false,
+      message: "Registration does not exist.",
+    });
+  }
+
+  let response;
+
+  if (verification_means === "phone") {
+    response = await send_message_otp(phone, {
+      platform,
+      profile_type: profile,
+    });
+  } else
+    response = await send_profile_otp(email, {
+      platform,
+      profile_type: profile,
+      profile: data,
+    });
+
+  res.json({
+    ok: response?.sent,
+    message: response?.sent
+      ? `Verification code have been re-sent to ${verification_means}`
+      : `Err, Something went wrong`,
+  });
+};
+
+export {
+  signin,
+  signup,
+  verify_profile,
+  get_profile,
+  update_profile_password,
+  resend_profile_otp,
+};

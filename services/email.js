@@ -3,14 +3,53 @@ import { PROFILE_ID } from "../handlers/auth.js";
 
 let base_domain = `savvyaisolution.com`;
 let email_service = `https://email-api.${base_domain}`;
-let FROM = "Savvy Profile";
+let FROM = "Profile Graph";
 
 let gen_otp = (length = 6) => {
   let otp = Math.random()
     .toString()
-    .slice(-1 * length);
+    .slice(-1 * (length || 6));
 
   return otp;
+};
+
+const send_message_otp = async (phone, { platform, profile_type }) => {
+  let settings = await (await SETTINGS()).findOne({ _id: platform });
+
+  let otp_expiry = settings?.otp_expiry?.toString() || "5";
+  let otp = gen_otp(settings?.otp_length);
+
+  profile_type = await (await PROFILE_TYPES()).findOne({ _id: profile_type });
+
+  let platfom = await (await USERS()).findOne({ _id: platform });
+
+  let res = await fetch(`${email_service}/send_message`, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      phone,
+      user: PROFILE_ID,
+      message: `[${platfom.fullname}] Your OTP is ${otp}. Expires in ${otp_expiry} minutes.`,
+    }),
+  });
+
+  res = await res.json();
+
+  if (res?.data?.sent) {
+    const StoreOtp = await STORE_OTP(true);
+    await StoreOtp.updateOne(
+      { phone, profile_id: profile_type._id },
+      { $set: { otp, otp_expiry, updated: Date.now() } },
+      { upsert: true }
+    );
+
+    res = res.data;
+  }
+
+  return res;
 };
 
 const send_mail = async (email, args, template, from) => {
@@ -80,7 +119,21 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
   profile_type = await (await PROFILE_TYPES()).findOne({ _id: profile_type });
 
   let platfom = await (await USERS()).findOne({ _id: platform });
-  console.log(platfom, platform, profile_type);
+
+  let body = {
+    user: PROFILE_ID,
+    from: platfom.fullname,
+    email,
+    template: "otp:branded",
+    args: {
+      otp_code: otp,
+      expiry_time: otp_expiry,
+      brand_name: platfom?.fullname,
+      user_name: profile.firstname
+        ? `${profile.firstname} ${profile.lastname}`
+        : "There",
+    },
+  };
 
   let res = await fetch(`${email_service}/send`, {
     method: "POST",
@@ -88,20 +141,7 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
       Accept: "application/json",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      user: PROFILE_ID,
-      email,
-      from: platfom.fullname,
-      template: "otp:branded",
-      args: {
-        otp_code: otp,
-        expiry_time: otp_expiry,
-        brand_name: profile_type?.name,
-        user_name: profile.firstname
-          ? `${profile.firstname} ${profile.lastname}`
-          : "There",
-      },
-    }),
+    body: JSON.stringify(body),
   });
   res = await res.json();
 
@@ -119,4 +159,11 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
   return res;
 };
 
-export { send_otp, send_profile_otp, send_mail, FROM, base_domain };
+export {
+  send_otp,
+  send_profile_otp,
+  send_mail,
+  FROM,
+  base_domain,
+  send_message_otp,
+};
