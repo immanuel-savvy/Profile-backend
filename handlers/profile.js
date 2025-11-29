@@ -243,7 +243,7 @@ const signin = async (req, res) => {
     await PROFILE_PASSWORDS()
   ).findOne({ _id: profile._id });
 
-  if (!password_store) {
+  if (!password_store || password_store?.key === hash("")) {
     return res.json({ ok: false, message: "Password not set" });
   }
 
