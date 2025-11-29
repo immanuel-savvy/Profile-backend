@@ -244,7 +244,11 @@ const signin = async (req, res) => {
   ).findOne({ _id: profile._id });
 
   if (!password_store || password_store?.key === hash("")) {
-    return res.json({ ok: false, message: "Password not set" });
+    return res.json({
+      ok: false,
+      message: "Password not set",
+      data: { _id: profile._id },
+    });
   }
 
   let pass_pass = hash(password) === password_store.key;
