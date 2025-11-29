@@ -24,6 +24,22 @@ const signup = async (req, res) => {
   console.log(platform, profile_id, data, password);
   // data-> email, firstname, lastname, bio, ... (phone)
 
+  let Profiles = await PROFILES();
+
+  // Check if email/phone already belongs to a verified profile
+  const existingProfile = await Profiles.findOne({
+    [verification_means]:
+      verification_means === "email" ? data.email : data.phone,
+    profile: profile_id,
+  });
+
+  if (existingProfile) {
+    return res.json({
+      ok: false,
+      message: `This ${verification_means} is already registered for this profile type`,
+    });
+  }
+
   let Pending_profiles = await PENDING_PROFILES();
 
   let tried = await Pending_profiles.findOne({
