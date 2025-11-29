@@ -268,10 +268,12 @@ const signin = async (req, res) => {
 };
 
 const get_profile = async (req, res) => {
-  let { email, profile_type, token } = req.body;
+  let { email, profile_type, _id, token } = req.body;
 
   let Profiles = await PROFILES();
-  let profile = await Profiles.findOne({ email, profile: profile_type });
+  let profile = await Profiles.findOne(
+    _id ? { _id } : { email, profile: profile_type }
+  );
 
   res.json({
     ok: !!profile,
