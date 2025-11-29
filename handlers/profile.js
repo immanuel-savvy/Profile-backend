@@ -33,6 +33,17 @@ const signup = async (req, res) => {
   });
 
   if (tried) {
+    if (verification_means === "phone") {
+      await send_message_otp(data.phone, {
+        platform,
+        profile_type: profile_id,
+      });
+    } else
+      await send_profile_otp(data.email, {
+        platform,
+        profile_type: profile_id,
+        profile: data,
+      });
     await Pending_profiles.updateOne(
       { _id: tried._id },
       {

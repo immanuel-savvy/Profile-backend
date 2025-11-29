@@ -6,10 +6,10 @@ let base_domain = `savvyaisolution.com`;
 let email_service = `https://email-api.${base_domain}`;
 let FROM = "Profile Graph";
 
-let gen_otp = (length = 6) => {
+let gen_otp = (length = 4) => {
   let otp = Math.random()
     .toString()
-    .slice(-1 * (length || 6));
+    .slice(-1 * (length || 4));
 
   return otp;
 };
