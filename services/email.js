@@ -1,5 +1,6 @@
 import { PROFILE_TYPES, SETTINGS, STORE_OTP, USERS } from "../ds/folders.js";
 import { PROFILE_ID } from "../handlers/auth.js";
+import crypto from "crypto";
 
 let base_domain = `savvyaisolution.com`;
 let email_service = `https://email-api.${base_domain}`;
@@ -40,9 +41,13 @@ const send_message_otp = async (phone, { platform, profile_type }) => {
 
   if (res?.data?.sent) {
     const StoreOtp = await STORE_OTP(true);
+    const otpId = crypto.randomUUID();
     await StoreOtp.updateOne(
       { phone, profile_id: profile_type._id },
-      { $set: { otp, otp_expiry, updated: Date.now() } },
+      {
+        $set: { otp, otp_expiry, updated: Date.now() },
+        $setOnInsert: { _id: otpId },
+      },
       { upsert: true }
     );
 
@@ -98,9 +103,13 @@ const send_otp = async (email, fullname) => {
 
   if (res?.data?.sent) {
     const StoreOtp = await STORE_OTP();
+    const otpId = crypto.randomUUID();
     await StoreOtp.updateOne(
       { email },
-      { $set: { otp, updated: Date.now() } },
+      {
+        $set: { otp, updated: Date.now() },
+        $setOnInsert: { _id: otpId },
+      },
       { upsert: true }
     );
 
@@ -147,9 +156,13 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
 
   if (res?.data?.sent) {
     const StoreOtp = await STORE_OTP(true);
+    const otpId = crypto.randomUUID();
     await StoreOtp.updateOne(
       { email, profile_id: profile_type._id },
-      { $set: { otp, otp_expiry, updated: Date.now() } },
+      {
+        $set: { otp, otp_expiry, updated: Date.now() },
+        $setOnInsert: { _id: otpId },
+      },
       { upsert: true }
     );
 
