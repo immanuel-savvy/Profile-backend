@@ -11,6 +11,8 @@ const register = async (req, res) => {
   // email, fullname, about, password,
   data.password = hash(data.password);
 
+  if (data.email) data.email = data.email.trim().toLowerCase();
+
   let Pending_users = await PENDING_USERS();
   let tried = await Pending_users.findOne({ email: data.email });
 
@@ -51,6 +53,7 @@ const register = async (req, res) => {
 
 const verify = async (req, res) => {
   let { email, code } = req.body;
+  if (email) email = email.trim().toLowerCase();
 
   let Stored_otp = await STORE_OTP();
   let store;
@@ -126,6 +129,8 @@ const verify = async (req, res) => {
 const login = async (req, res) => {
   let { email, password } = req.body;
 
+  if (email) email = email.trim().toLowerCase();
+
   let Users = await USERS();
   let usr = await Users.findOne({ email });
 
@@ -171,6 +176,7 @@ const login = async (req, res) => {
 const get_user = async (req, res) => {
   let { email, token } = req.body;
 
+  if (email) email = email.trim().toLowerCase();
   let user = await (await USERS()).findOne({ email });
 
   res.json({

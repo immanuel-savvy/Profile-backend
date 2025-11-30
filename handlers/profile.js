@@ -27,6 +27,7 @@ const signup = async (req, res) => {
   let Profiles = await PROFILES();
 
   // Check if email/phone already belongs to a verified profile
+  if (data.email) data.email = data.email.trim().toLowerCase();
   const existingProfile = await Profiles.findOne({
     [verification_means]:
       verification_means === "email" ? data.email : data.phone,
@@ -113,6 +114,9 @@ const signup = async (req, res) => {
 const verify_profile = async (req, res) => {
   let { email, code, phone, profile, verification_means } = req.body;
   verification_means = VERIFICATION_MEANS[verification_means || 0];
+
+  if (email) email = email.trim().toLowerCase();
+  code = code.trim();
 
   let Profile_types = await PROFILE_TYPES();
   let profile_type = await Profile_types.findOne({ _id: profile });
@@ -229,6 +233,8 @@ const update_profile_password = async (req, res) => {
 const signin = async (req, res) => {
   let { email, password, profile: profile_id } = req.body;
 
+  if (email) email = email.trim().toLowerCase();
+
   let Profiles = await PROFILES();
   let profile = await Profiles.findOne({ email, profile: profile_id });
 
@@ -270,6 +276,8 @@ const signin = async (req, res) => {
 const get_profile = async (req, res) => {
   let { email, profile_type, _id, token } = req.body;
 
+  if (email) email = email.trim().toLowerCase();
+
   let Profiles = await PROFILES();
   let profile = await Profiles.findOne(
     _id ? { _id } : { email, profile: profile_type }
@@ -286,6 +294,8 @@ const resend_profile_otp = async (req, res) => {
   let { email, phone, platform, profile, verification_means } = req.body;
 
   verification_means = VERIFICATION_MEANS[verification_means || 0];
+
+  if (email) email = email.trim().toLowerCase();
 
   let Pending_profiles = await PENDING_PROFILES();
 
