@@ -70,13 +70,11 @@ const get_profile_types = async (req, res) => {
     .limit(limit)
     .toArray();
 
-  let total = await Profile_types.countDocuments({ platform });
-
   res.json({
     ok: true,
     message: "Profile types retrieved",
     data,
-    pagination: pagination(total, limit, skip),
+    pagination: pagination(Profile_types, limit, skip),
   });
 };
 
@@ -107,13 +105,11 @@ const get_profiles = async (req, res) => {
     .limit(limit)
     .toArray();
 
-  let total = await Profiles.countDocuments({ profile });
-
   res.json({
     ok: true,
     message: "Profile retrieved",
     data,
-    pagination: pagination(total, limit, skip),
+    pagination: pagination(Profiles, limit, skip),
   });
 };
 

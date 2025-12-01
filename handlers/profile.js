@@ -14,15 +14,24 @@ import {
 } from "../services/email.js";
 import { hash } from "../utils/hash.js";
 import crypto from "crypto";
+import { OAuth2Client } from "google-auth-library";
+
+const WEB_CLIENT_ID = process.env.WEB_CLIENT_ID;
+const client = new OAuth2Client(WEB_CLIENT_ID);
 
 const VERIFICATION_MEANS = ["email", "phone"];
 
 const signup = async (req, res) => {
-  let { platform, profile_id, data, password, verification_means } = req.body;
+  let { platform, profile_id, data, password, verification_means, social } =
+    req.body;
   verification_means = VERIFICATION_MEANS[verification_means || 0];
 
   console.log(platform, profile_id, data, password);
   // data-> email, firstname, lastname, bio, ... (phone)
+
+  if (social) {
+    return await social_auth(social, { profile_id, res });
+  }
 
   let Profiles = await PROFILES();
 
@@ -173,29 +182,7 @@ const verify_profile = async (req, res) => {
 
     // Send welcome message to email.
     if (profile_usr.data.email) {
-      let platform = await (
-        await USERS()
-      ).findOne({ _id: profile_type.platform });
-
-      let args = {
-        brand_name: platform.fullname,
-      };
-
-      if (profile_usr.data.firstname) {
-        args.user_name =
-          `${profile_usr.data.firstname} ${profile_usr.data.lastname}`.trim();
-      }
-      let setting = await (await SETTINGS()).findOne({ _id: platform._id });
-      args.support_email = setting?.support_email || platform.email;
-      await send_mail(
-        profile_usr.data.email,
-        args,
-        setting?.welcome_email ||
-          (args.user_name
-            ? "welcome:branded-support"
-            : "welcome:branded-no-username"),
-        platform.fullname
-      );
+      await send_welcome_email({ profile_type, profile_usr });
     }
 
     let Passwords = await PROFILE_PASSWORDS();
@@ -208,6 +195,30 @@ const verify_profile = async (req, res) => {
   }
 
   res.json(response);
+};
+
+const send_welcome_email = async ({ profile_type, profile_usr }) => {
+  let platform = await (await USERS()).findOne({ _id: profile_type.platform });
+
+  let args = {
+    brand_name: platform.fullname,
+  };
+
+  if (profile_usr.data.firstname) {
+    args.user_name =
+      `${profile_usr.data.firstname} ${profile_usr.data.lastname}`.trim();
+  }
+  let setting = await (await SETTINGS()).findOne({ _id: platform._id });
+  args.support_email = setting?.support_email || platform.email;
+  await send_mail(
+    profile_usr.data.email,
+    args,
+    setting?.welcome_email ||
+      (args.user_name
+        ? "welcome:branded-support"
+        : "welcome:branded-no-username"),
+    platform.fullname
+  );
 };
 
 const update_profile_password = async (req, res) => {
@@ -230,12 +241,103 @@ const update_profile_password = async (req, res) => {
   });
 };
 
+const social_auth = async (social, { profile_id, res }) => {
+  let Profiles = await PROFILES();
+
+  try {
+    // 1. Verify Google ID token
+    const ticket = await client.verifyIdToken({
+      idToken: social.data.idToken,
+      audience: WEB_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+
+    const email = payload.email?.trim().toLowerCase();
+    const firstname = payload.givenName || payload.given_name;
+    const lastname = payload.familyName || payload.family_name;
+    const picture = payload.picture;
+
+    if (!email) {
+      return res.json({
+        ok: false,
+        message: "Google account does not contain a valid email",
+      });
+    }
+
+    // Object for insert-on-new-profile
+    const obj = {
+      firstname,
+      lastname,
+      image: picture,
+    };
+
+    // 2. Try updating (but no auto insert)
+    let result = await Profiles.findOneAndUpdate(
+      { email, profile: profile_id },
+      {
+        // If it exists, we update nothing (safe)
+        $setOnInsert: obj,
+      },
+      {
+        upsert: false, // do NOT auto insert
+        returnDocument: "after", // return updated version of profile
+      }
+    );
+
+    // 3. If no match found → manually insert
+    if (!result.value) {
+      const profileId = crypto.randomUUID();
+      const profile_obj = {
+        _id: profileId,
+        ...obj,
+        email,
+        profile: profile_id,
+      };
+
+      await Profiles.insertOne(profile_obj);
+      result = { value: profile_obj };
+
+      await send_welcome_email({
+        profile_type: await (
+          await PROFILE_TYPES()
+        ).findOne({ _id: profile_id }),
+        profile_usr: profile_obj,
+      });
+
+      let Passwords = await PROFILE_PASSWORDS();
+      await Passwords.insertOne({
+        _id: profileId,
+        key: hash(""),
+      });
+    }
+
+    // 4. Respond with profile (updated or newly inserted)
+    return res.json({
+      ok: true,
+      message: "User login successful",
+      data: result.value,
+    });
+  } catch (error) {
+    console.error("Invalid Google ID Token:", error.message);
+
+    return res.json({
+      ok: false,
+      message: "Invalid Google authentication token",
+    });
+  }
+};
+
 const signin = async (req, res) => {
-  let { email, password, profile: profile_id } = req.body;
+  let { email, password, profile: profile_id, social } = req.body;
+
+  let Profiles = await PROFILES();
+  if (social) {
+    return await social_auth(social, { res, profile_id });
+  }
 
   if (email) email = email.trim().toLowerCase();
 
-  let Profiles = await PROFILES();
   let profile = await Profiles.findOne({ email, profile: profile_id });
 
   if (!profile) {
@@ -322,7 +424,7 @@ const resend_profile_otp = async (req, res) => {
     response = await send_profile_otp(email, {
       platform,
       profile_type: profile,
-      profile: data,
+      profile: tried.data,
     });
 
   res.json({
