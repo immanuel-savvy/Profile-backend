@@ -182,7 +182,7 @@ const verify_profile = async (req, res) => {
 
     // Send welcome message to email.
     if (profile_usr.data.email) {
-      await send_welcome_email({ profile_type, profile_usr });
+      await send_welcome_email({ profile_type, profile_usr: profile_usr.data });
     }
 
     let Passwords = await PROFILE_PASSWORDS();
@@ -204,14 +204,13 @@ const send_welcome_email = async ({ profile_type, profile_usr }) => {
     brand_name: platform.fullname,
   };
 
-  if (profile_usr.data.firstname) {
-    args.user_name =
-      `${profile_usr.data.firstname} ${profile_usr.data.lastname}`.trim();
+  if (profile_usr.firstname) {
+    args.user_name = `${profile_usr.firstname} ${profile_usr.lastname}`.trim();
   }
   let setting = await (await SETTINGS()).findOne({ _id: platform._id });
   args.support_email = setting?.support_email || platform.email;
   await send_mail(
-    profile_usr.data.email,
+    profile_usr.email,
     args,
     setting?.welcome_email ||
       (args.user_name
@@ -291,6 +290,9 @@ const social_auth = async (social, { profile_id, res }) => {
         returnDocument: "after", // return updated version of profile
       }
     );
+
+    console.log(JSON.stringify(result));
+    console.log(result.value);
 
     // 3. If no match found → manually insert
     if (!result.value) {
