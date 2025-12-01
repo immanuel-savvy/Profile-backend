@@ -253,9 +253,16 @@ const social_auth = async (social, { profile_id, res }) => {
 
     const payload = ticket.getPayload();
 
+    if (!payload) {
+      return res.json({
+        ok: false,
+        message: "Could not verify Google ID token",
+      });
+    }
+
     const email = payload.email?.trim().toLowerCase();
-    const firstname = payload.givenName || payload.given_name;
-    const lastname = payload.familyName || payload.family_name;
+    const firstname = payload.given_name || payload.givenName;
+    const lastname = payload.family_name || payload.familyName;
     const picture = payload.picture || payload.photo;
 
     if (!email) {
