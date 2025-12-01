@@ -278,26 +278,36 @@ const social_auth = async (social, { profile_id, res }) => {
       image: picture,
     };
 
-    // 2. Try updating (but no auto insert)
-    let result = await Profiles.findOneAndUpdate(
-      { email, profile: profile_id },
-      {
-        // If it exists, we update nothing (safe)
-        $setOnInsert: obj,
-      },
-      {
-        upsert: false, // do NOT auto insert
-        returnDocument: "after", // return updated version of profile
-      }
-    );
+    const existing = await Profiles.findOne({ email, profile: profile_id });
 
-    // 3. If no match found → manually insert
-    if (!result) {
+    let result;
+
+    if (existing) {
+      // Determine fields that are missing
+      const updateObj = {};
+      if (!existing.firstname && firstname) updateObj.firstname = firstname;
+      if (!existing.lastname && lastname) updateObj.lastname = lastname;
+      if (!existing.image && picture) updateObj.image = picture;
+
+      if (Object.keys(updateObj).length > 0) {
+        // Only update if there are missing fields
+        result = await Profiles.findOneAndUpdate(
+          { email, profile: profile_id },
+          { $set: updateObj },
+          { returnDocument: "after" }
+        );
+      } else {
+        // Nothing to update, just return existing
+        result = existing;
+      }
+    } else {
+      // 3. If no match found → manually insert
       const profileId = crypto.randomUUID();
       const profile_obj = {
         _id: profileId,
         ...obj,
         email,
+        verified: ["email"],
         profile: profile_id,
       };
 
