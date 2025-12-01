@@ -247,7 +247,7 @@ const social_auth = async (social, { profile_id, res }) => {
   try {
     // 1. Verify Google ID token
     const ticket = await client.verifyIdToken({
-      idToken: social.data.idToken,
+      idToken: social.idToken,
       audience: WEB_CLIENT_ID,
     });
 
@@ -256,7 +256,7 @@ const social_auth = async (social, { profile_id, res }) => {
     const email = payload.email?.trim().toLowerCase();
     const firstname = payload.givenName || payload.given_name;
     const lastname = payload.familyName || payload.family_name;
-    const picture = payload.picture;
+    const picture = payload.picture || payload.photo;
 
     if (!email) {
       return res.json({
