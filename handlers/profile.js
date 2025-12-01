@@ -260,8 +260,8 @@ const social_auth = async (social, { profile_id, res }) => {
     }
 
     const email = payload.email?.trim().toLowerCase();
-    const firstname = payload.given_name || payload.givenName;
-    const lastname = payload.family_name || payload.familyName;
+    const firstname = payload.given_name || payload.givenName || "";
+    const lastname = payload.family_name || payload.familyName || "";
     const picture = payload.picture || payload.photo;
 
     if (!email) {
@@ -291,11 +291,8 @@ const social_auth = async (social, { profile_id, res }) => {
       }
     );
 
-    console.log(JSON.stringify(result));
-    console.log(result.value);
-
     // 3. If no match found → manually insert
-    if (!result.value) {
+    if (!result) {
       const profileId = crypto.randomUUID();
       const profile_obj = {
         _id: profileId,
@@ -305,7 +302,7 @@ const social_auth = async (social, { profile_id, res }) => {
       };
 
       await Profiles.insertOne(profile_obj);
-      result = { value: profile_obj };
+      result = profile_obj;
 
       await send_welcome_email({
         profile_type: await (
@@ -325,7 +322,7 @@ const social_auth = async (social, { profile_id, res }) => {
     return res.json({
       ok: true,
       message: "User login successful",
-      data: result.value,
+      data: result,
     });
   } catch (error) {
     console.error("Invalid Google ID Token:", error.message);
