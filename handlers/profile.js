@@ -121,7 +121,7 @@ const signup = async (req, res) => {
 };
 
 const verify_forgot_password = async (req, res) => {
-  let { email, code, phone, profile, verification_means, platform } = req.body;
+  let { email, code, phone, profile, verification_means } = req.body;
   verification_means = VERIFICATION_MEANS[verification_means || 0];
 
   let profile_data = await (await PROFILES()).findOne({ email, profile });
@@ -150,7 +150,7 @@ const verify_forgot_password = async (req, res) => {
   let valid = store.otp === code;
   let response = {
     ok: valid,
-    message: valid ? "Profile verified successfully" : "Verification failed",
+    message: valid ? "OTP verified successfully" : "Verification failed",
   };
 
   if (valid) {
@@ -261,7 +261,7 @@ const send_welcome_email = async ({ profile_type, profile_usr }) => {
 };
 
 const update_profile_password = async (req, res) => {
-  let { profile, password, platform } = req.body;
+  let { profile, password, platform, reason } = req.body;
 
   let Passwords = await PROFILE_PASSWORDS();
 
