@@ -308,6 +308,7 @@ const social_auth = async (social, { profile_id, res }) => {
         ...obj,
         email,
         verified: ["email"],
+        social_signon: true,
         profile: profile_id,
       };
 
@@ -409,23 +410,36 @@ const get_profile = async (req, res) => {
 };
 
 const resend_profile_otp = async (req, res) => {
-  let { email, phone, platform, profile, verification_means } = req.body;
+  let { email, phone, platform, profile, verification_means, reason } =
+    req.body;
 
   verification_means = VERIFICATION_MEANS[verification_means || 0];
 
   if (email) email = email.trim().toLowerCase();
 
-  let Pending_profiles = await PENDING_PROFILES();
+  let data, false_message;
+  if (reason && reason !== "profile_verification") {
+    let profile_data = await (await PROFILES()).findOne({ email, profile });
 
-  let tried = await Pending_profiles.findOne({
-    profile_id: profile,
-    [verification_means]: verification_means === "email" ? email : phone,
-  });
+    if (!profile_data) false_message = "Profile is not registered.";
 
-  if (!tried) {
+    data = profile_data;
+  } else {
+    let Pending_profiles = await PENDING_PROFILES();
+
+    let tried = await Pending_profiles.findOne({
+      profile_id: profile,
+      [verification_means]: verification_means === "email" ? email : phone,
+    });
+
+    if (!tried) false_message = "Registration does not exist.";
+    else data = tried?.data;
+  }
+
+  if (!data) {
     return res.json({
       ok: false,
-      message: "Registration does not exist.",
+      message: false_message,
     });
   }
 
@@ -440,13 +454,14 @@ const resend_profile_otp = async (req, res) => {
     response = await send_profile_otp(email, {
       platform,
       profile_type: profile,
-      profile: tried.data,
+      profile: data,
+      template: reason,
     });
 
   res.json({
     ok: response?.sent,
     message: response?.sent
-      ? `Verification code have been re-sent to ${verification_means}`
+      ? `Verification code have been sent to ${verification_means}`
       : `Err, Something went wrong`,
   });
 };
