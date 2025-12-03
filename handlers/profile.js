@@ -155,20 +155,6 @@ const verify_forgot_password = async (req, res) => {
 
   if (valid) {
     response.data = profile_data;
-
-    let platform_data = await (await USERS()).findOne({ _id: platform });
-    await send_mail(
-      profile_data.email,
-      {
-        user_name:
-          profile_data.firstname || profile_data.lastname
-            ? `${profile_data.firstname} ${profile_data.lastname}`.trim()
-            : "There",
-        brand_name: platform_data.fullname,
-      },
-      "password_reset:branded_successful",
-      platform_data.fullname
-    );
   }
 
   res.json(response);
@@ -275,7 +261,7 @@ const send_welcome_email = async ({ profile_type, profile_usr }) => {
 };
 
 const update_profile_password = async (req, res) => {
-  let { profile, password } = req.body;
+  let { profile, password, platform } = req.body;
 
   let Passwords = await PROFILE_PASSWORDS();
 
@@ -285,8 +271,27 @@ const update_profile_password = async (req, res) => {
     { upsert: true }
   );
 
+  let ok = !!(result.modifiedCount || result.upsertedCount);
+
+  if (ok && reason === "forgot_password") {
+    let profile_data = await (await PROFILES()).findOne({ _id: profile });
+    let platform_data = await (await USERS()).findOne({ _id: platform });
+    await send_mail(
+      profile_data.email,
+      {
+        user_name:
+          profile_data.firstname || profile_data.lastname
+            ? `${profile_data.firstname} ${profile_data.lastname}`.trim()
+            : "There",
+        brand_name: platform_data.fullname,
+      },
+      "password_reset:branded_successful",
+      platform_data.fullname
+    );
+  }
+
   res.json({
-    ok: !!(result.modifiedCount || result.upsertedCount),
+    ok,
     message:
       result.modifiedCount || result.upsertedCount
         ? "Password Updated"
