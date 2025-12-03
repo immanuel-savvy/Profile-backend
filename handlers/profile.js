@@ -120,6 +120,60 @@ const signup = async (req, res) => {
   });
 };
 
+const verify_forgot_password = async (req, res) => {
+  let { email, code, phone, profile, verification_means, platform } = req.body;
+  verification_means = VERIFICATION_MEANS[verification_means || 0];
+
+  let profile_data = await (await PROFILES()).findOne({ email, profile });
+
+  if (!profile_data) {
+    return res.json({
+      ok: false,
+      message: `Profile is not registered`,
+    });
+  }
+
+  let Stored_otp = await STORE_OTP(true);
+
+  let store = await Stored_otp.findOne({
+    [verification_means]: verification_means === "email" ? email : phone,
+    profile_id: profile,
+  });
+
+  if (!store) {
+    return res.json({
+      ok: false,
+      message: "OTP is not found",
+    });
+  }
+
+  let valid = store.otp === code;
+  let response = {
+    ok: valid,
+    message: valid ? "Profile verified successfully" : "Verification failed",
+  };
+
+  if (valid) {
+    response.data = profile_data;
+
+    let platform_data = await (await USERS()).findOne({ _id: platform });
+    await send_mail(
+      profile_data.email,
+      {
+        user_name:
+          profile_data.firstname || profile_data.lastname
+            ? `${profile_data.firstname} ${profile_data.lastname}`.trim()
+            : "There",
+        brand_name: platform_data.fullname,
+      },
+      "password_reset:branded_successful",
+      platform_data.fullname
+    );
+  }
+
+  res.json(response);
+};
+
 const verify_profile = async (req, res) => {
   let { email, code, phone, profile, verification_means } = req.body;
   verification_means = VERIFICATION_MEANS[verification_means || 0];
@@ -473,4 +527,5 @@ export {
   get_profile,
   update_profile_password,
   resend_profile_otp,
+  verify_forgot_password,
 };
