@@ -136,7 +136,7 @@ const send_profile_otp = async (
     user: PROFILE_ID,
     from: platfom.fullname,
     email,
-    template: reason ? `${reason}:branded` : "otp:branded",
+    template: template || "otp:branded",
     args: {
       otp_code: otp,
       expiry_time: otp_expiry,

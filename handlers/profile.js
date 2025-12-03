@@ -455,7 +455,7 @@ const resend_profile_otp = async (req, res) => {
       platform,
       profile_type: profile,
       profile: data,
-      template: reason,
+      template: reason === "forgot_password" ? "forgot_password:branded" : "",
     });
 
   res.json({
