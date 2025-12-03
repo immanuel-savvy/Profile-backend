@@ -119,7 +119,10 @@ const send_otp = async (email, fullname) => {
   return res;
 };
 
-const send_profile_otp = async (email, { platform, profile_type, profile }) => {
+const send_profile_otp = async (
+  email,
+  { platform, profile_type, profile, template }
+) => {
   let settings = await (await SETTINGS()).findOne({ _id: platform });
 
   let otp_expiry = settings?.otp_expiry?.toString() || "5";
@@ -133,7 +136,7 @@ const send_profile_otp = async (email, { platform, profile_type, profile }) => {
     user: PROFILE_ID,
     from: platfom.fullname,
     email,
-    template: "otp:branded",
+    template: reason ? `${reason}:branded` : "otp:branded",
     args: {
       otp_code: otp,
       expiry_time: otp_expiry,
