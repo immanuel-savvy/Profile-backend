@@ -5,6 +5,7 @@ import {
   resend_profile_otp,
   signin,
   signup,
+  update_profile,
   update_profile_password,
   verify_forgot_password,
   verify_profile,
@@ -33,6 +34,7 @@ const router = (app) => {
   app.post("/verify_forgot_password", verify_forgot_password);
   app.post("/resend_profile_otp", resend_profile_otp);
   app.post("/get_profile", get_profile);
+  app.post("/update_profile", update_profile);
   app.post("/update_profile_password", update_profile_password);
 
   // User

@@ -525,7 +525,21 @@ const resend_profile_otp = async (req, res) => {
   });
 };
 
+const update_profile = async (req, res) => {
+  let { _id, data } = req.body;
+
+  let Profiles = await PROFILES();
+
+  let result = await Profiles.updateOne({ _id }, { $set: data });
+
+  res.json({
+    ok: !!result.modifiedCount,
+    message: result.modifiedCount ? "Profile updated" : "Profile update failed",
+  });
+};
+
 export {
+  update_profile,
   signin,
   signup,
   verify_profile,
