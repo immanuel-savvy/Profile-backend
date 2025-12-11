@@ -9,6 +9,7 @@ import {
   update_profile_password,
   verify_forgot_password,
   verify_profile,
+  verify_profile_password,
 } from "./handlers/profile.js";
 import {
   get_profile_type,
@@ -36,6 +37,7 @@ const router = (app) => {
   app.post("/get_profile", get_profile);
   app.post("/update_profile", update_profile);
   app.post("/update_profile_password", update_profile_password);
+  app.post("/verify_profile_password", verify_profile_password);
 
   // User
   app.post("/new_profile_type", new_profile_type);

@@ -538,9 +538,32 @@ const update_profile = async (req, res) => {
   });
 };
 
+const verify_profile_password = async (req, res) => {
+  let { profile, password } = req.body;
+
+  let Passwords = await PROFILE_PASSWORDS();
+
+  let password_store = await Passwords.findOne({ _id: profile });
+
+  if (!password_store || password_store?.key === hash("")) {
+    return res.json({
+      ok: false,
+      message: "Password not set",
+    });
+  }
+
+  let pass_pass = hash(password) === password_store.key;
+
+  res.json({
+    ok: pass_pass,
+    message: pass_pass ? "Password verified" : "Password invalid",
+  });
+};
+
 export {
   update_profile,
   signin,
+  verify_profile_password,
   signup,
   verify_profile,
   get_profile,
