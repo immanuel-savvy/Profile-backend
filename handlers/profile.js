@@ -19,12 +19,12 @@ import { OAuth2Client } from "google-auth-library";
 const WEB_CLIENT_ID = process.env.WEB_CLIENT_ID;
 const client = new OAuth2Client(WEB_CLIENT_ID);
 
-const VERIFICATION_MEANS = ["email", "phone"];
+const VERIFICATION_MEANS = { email: "email", phone: "phone" };
 
 const signup = async (req, res) => {
   let { platform, profile_id, data, password, verification_means, social } =
     req.body;
-  verification_means = VERIFICATION_MEANS[verification_means || 0];
+  verification_means = VERIFICATION_MEANS[verification_means || "email"];
 
   console.log(platform, profile_id, data, password);
   // data-> email, firstname, lastname, bio, ... (phone)
@@ -37,10 +37,14 @@ const signup = async (req, res) => {
 
   // Check if email/phone already belongs to a verified profile
   if (data.email) data.email = data.email.trim().toLowerCase();
+
+  if (data.phone) data.phone = data.phone.trim().toLowerCase();
   const existingProfile = await Profiles.findOne({
-    [verification_means]:
-      verification_means === "email" ? data.email : data.phone,
     profile: profile_id,
+    $or: [
+      ...(data.email ? [{ email: data.email }] : []),
+      ...(data.phone ? [{ phone: data.phone }] : []),
+    ],
   });
 
   if (existingProfile) {
@@ -122,9 +126,14 @@ const signup = async (req, res) => {
 
 const verify_forgot_password = async (req, res) => {
   let { email, code, phone, profile, verification_means } = req.body;
-  verification_means = VERIFICATION_MEANS[verification_means || 0];
+  verification_means = VERIFICATION_MEANS[verification_means || "email"];
 
-  let profile_data = await (await PROFILES()).findOne({ email, profile });
+  let profile_data = await (
+    await PROFILES()
+  ).findOne({
+    profile,
+    $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
+  });
 
   if (!profile_data) {
     return res.json({
@@ -162,7 +171,7 @@ const verify_forgot_password = async (req, res) => {
 
 const verify_profile = async (req, res) => {
   let { email, code, phone, profile, verification_means } = req.body;
-  verification_means = VERIFICATION_MEANS[verification_means || 0];
+  verification_means = VERIFICATION_MEANS[verification_means || "email"];
 
   if (email) email = email.trim().toLowerCase();
   code = code.trim();
@@ -405,7 +414,7 @@ const social_auth = async (social, { profile_id, res }) => {
 };
 
 const signin = async (req, res) => {
-  let { email, password, profile: profile_id, social } = req.body;
+  let { email, password, profile: profile_id, phone, social } = req.body;
 
   let Profiles = await PROFILES();
   if (social) {
@@ -414,7 +423,10 @@ const signin = async (req, res) => {
 
   if (email) email = email.trim().toLowerCase();
 
-  let profile = await Profiles.findOne({ email, profile: profile_id });
+  let profile = await Profiles.findOne({
+    profile: profile_id,
+    $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
+  });
 
   if (!profile) {
     return res.json({
@@ -452,13 +464,18 @@ const signin = async (req, res) => {
 };
 
 const get_profile = async (req, res) => {
-  let { email, profile_type, _id, token } = req.body;
+  let { email, profile_type, phone, _id, token } = req.body;
 
   if (email) email = email.trim().toLowerCase();
 
   let Profiles = await PROFILES();
   let profile = await Profiles.findOne(
-    _id ? { _id } : { email, profile: profile_type }
+    _id
+      ? { _id }
+      : {
+          $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
+          profile: profile_type,
+        }
   );
 
   res.json({
@@ -472,13 +489,18 @@ const resend_profile_otp = async (req, res) => {
   let { email, phone, platform, profile, verification_means, reason } =
     req.body;
 
-  verification_means = VERIFICATION_MEANS[verification_means || 0];
+  verification_means = VERIFICATION_MEANS[verification_means || "email"];
 
   if (email) email = email.trim().toLowerCase();
 
   let data, false_message;
   if (reason && reason !== "profile_verification") {
-    let profile_data = await (await PROFILES()).findOne({ email, profile });
+    let profile_data = await (
+      await PROFILES()
+    ).findOne({
+      profile,
+      $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
+    });
 
     if (!profile_data) false_message = "Profile is not registered.";
 
