@@ -15,9 +15,6 @@ let gen_otp = (length = 4) => {
 };
 
 const send_message_otp = async (phone, { platform, profile_type }) => {
-  if (phone?.startsWith("+")) {
-    phone = phone.slice(1);
-  }
   let settings = await (await SETTINGS()).findOne({ _id: platform });
 
   let otp_expiry = settings?.otp_expiry?.toString() || "5";
@@ -34,7 +31,7 @@ const send_message_otp = async (phone, { platform, profile_type }) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      recipient: phone,
+      recipient: phone?.startsWith("+") ? phone.slice(1) : phone,
       user: PROFILE_ID,
       channel: "sms",
       message: `[${platfom.fullname}] Your OTP is ${otp}. Expires in ${otp_expiry} minutes.`,
