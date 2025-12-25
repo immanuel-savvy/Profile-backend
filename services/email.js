@@ -15,6 +15,9 @@ let gen_otp = (length = 4) => {
 };
 
 const send_message_otp = async (phone, { platform, profile_type }) => {
+  if (phone?.startsWith("+")) {
+    phone = phone.slice(1);
+  }
   let settings = await (await SETTINGS()).findOne({ _id: platform });
 
   let otp_expiry = settings?.otp_expiry?.toString() || "5";
