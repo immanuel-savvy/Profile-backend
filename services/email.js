@@ -34,8 +34,9 @@ const send_message_otp = async (phone, { platform, profile_type }) => {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      phone,
+      recipient: phone,
       user: PROFILE_ID,
+      channel: "sms",
       message: `[${platfom.fullname}] Your OTP is ${otp}. Expires in ${otp_expiry} minutes.`,
     }),
   });
