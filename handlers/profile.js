@@ -582,7 +582,77 @@ const verify_profile_password = async (req, res) => {
   });
 };
 
+const update_phone = async (req, res) => {
+  let { profile, phone, platform, profile_id } = req.body;
+
+  let response = await send_message_otp(phone, {
+    platform,
+    profile_type: profile_id,
+  });
+
+  res.json({
+    ok: response?.sent,
+    message: response?.sent
+      ? `Verification code have been sent to phone`
+      : `Err, Something went wrong`,
+  });
+};
+
+const update_email = async (req, res) => {
+  let { profile, email, profile_id, platform } = req.body;
+
+  let response = await send_profile_otp(email, {
+    platform,
+    profile_type: profile_id,
+    profile: await (await PROFILES()).findOne({ _id: profile }),
+  });
+
+  res.json({
+    ok: response?.sent,
+    message: response?.sent
+      ? `Verification code have been sent to email`
+      : `Err, Something went wrong`,
+  });
+};
+
+const verify_email_or_phone = async (req, res) => {
+  let { email, verifying, phone, profile, code } = req.body;
+
+  let Stored_otp = await STORE_OTP(true);
+
+  let store = await Stored_otp.findOne({
+    [verifying]: verifying === "email" ? email : phone,
+    profile_id: profile,
+  });
+
+  if (!store) {
+    return res.json({
+      ok: false,
+      message: "OTP is not found",
+    });
+  }
+
+  let valid = store.otp === code;
+  let response = {
+    ok: valid,
+    message: valid ? "OTP verified successfully" : "Verification failed",
+  };
+
+  if (valid) {
+    await (
+      await PROFILES()
+    ).updateOne({ _id: profile }, { $addToSet: { verified: verifying } });
+  }
+
+  res.json({
+    ...response,
+  });
+};
+
 export {
+  update_email,
+  verify_email_or_phone,
+  update_phone,
   update_profile,
   signin,
   verify_profile_password,
