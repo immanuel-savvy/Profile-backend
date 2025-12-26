@@ -38,7 +38,7 @@ const signup = async (req, res) => {
   // Check if email/phone already belongs to a verified profile
   if (data.email) data.email = data.email.trim().toLowerCase();
 
-  if (data.phone) data.phone = data.phone.trim().toLowerCase();
+  if (data.phone) data.phone = data.phone.trim();
   const existingProfile = await Profiles.findOne({
     profile: profile_id,
     $or: [
@@ -585,6 +585,19 @@ const verify_profile_password = async (req, res) => {
 const update_phone = async (req, res) => {
   let { profile, phone, platform, profile_id } = req.body;
 
+  let Profiles = await PROFILES();
+  const existingProfile = await Profiles.findOne({
+    profile: profile_id,
+    phone,
+  });
+
+  if (existingProfile) {
+    return res.json({
+      ok: false,
+      message: `This phone is already registered for this profile type`,
+    });
+  }
+
   let response = await send_message_otp(phone, {
     platform,
     profile_type: profile_id,
@@ -600,6 +613,19 @@ const update_phone = async (req, res) => {
 
 const update_email = async (req, res) => {
   let { profile, email, profile_id, platform } = req.body;
+
+  let Profiles = await PROFILES();
+  const existingProfile = await Profiles.findOne({
+    profile: profile_id,
+    email,
+  });
+
+  if (existingProfile) {
+    return res.json({
+      ok: false,
+      message: `This phone is already registered for this profile type`,
+    });
+  }
 
   let response = await send_profile_otp(email, {
     platform,
