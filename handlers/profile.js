@@ -616,7 +616,8 @@ const update_email = async (req, res) => {
 };
 
 const verify_email_or_phone = async (req, res) => {
-  let { email, verification_means, phone, profile, code } = req.body;
+  let { email, verification_means, phone, profile_user, profile, code } =
+    req.body;
 
   let Stored_otp = await STORE_OTP(true);
 
@@ -642,7 +643,7 @@ const verify_email_or_phone = async (req, res) => {
     await (
       await PROFILES()
     ).updateOne(
-      { _id: profile },
+      { _id: profile_user },
       { $addToSet: { verified: verification_means } }
     );
   }
