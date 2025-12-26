@@ -623,7 +623,7 @@ const update_email = async (req, res) => {
   if (existingProfile) {
     return res.json({
       ok: false,
-      message: `This phone is already registered for this profile type`,
+      message: `This email is already registered for this profile type`,
     });
   }
 
