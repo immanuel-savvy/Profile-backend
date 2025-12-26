@@ -616,12 +616,12 @@ const update_email = async (req, res) => {
 };
 
 const verify_email_or_phone = async (req, res) => {
-  let { email, verifying, phone, profile, code } = req.body;
+  let { email, verification_means, phone, profile, code } = req.body;
 
   let Stored_otp = await STORE_OTP(true);
 
   let store = await Stored_otp.findOne({
-    [verifying]: verifying === "email" ? email : phone,
+    [verification_means]: verification_means === "email" ? email : phone,
     profile_id: profile,
   });
 
@@ -641,7 +641,10 @@ const verify_email_or_phone = async (req, res) => {
   if (valid) {
     await (
       await PROFILES()
-    ).updateOne({ _id: profile }, { $addToSet: { verified: verifying } });
+    ).updateOne(
+      { _id: profile },
+      { $addToSet: { verified: verification_means } }
+    );
   }
 
   res.json({
