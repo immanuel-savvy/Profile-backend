@@ -5,8 +5,11 @@ import {
   resend_profile_otp,
   signin,
   signup,
+  update_email,
+  update_phone,
   update_profile,
   update_profile_password,
+  verify_email_or_phone,
   verify_forgot_password,
   verify_profile,
   verify_profile_password,
@@ -38,6 +41,9 @@ const router = (app) => {
   app.post("/update_profile", update_profile);
   app.post("/update_profile_password", update_profile_password);
   app.post("/verify_profile_password", verify_profile_password);
+  app.post("/update_email", update_email);
+  app.post("/update_phone", update_phone);
+  app.post("/verify_email_or_phone", verify_email_or_phone);
 
   // User
   app.post("/new_profile_type", new_profile_type);
@@ -45,6 +51,7 @@ const router = (app) => {
   app.post("/get_profile_type", get_profile_type);
   app.post("/get_profile_types", get_profile_types);
   app.post("/get_profiles", get_profiles);
+
   // Settings
   app.post("/settings", settings);
   app.post("/get_settings", get_settings);
