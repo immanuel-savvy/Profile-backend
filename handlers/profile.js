@@ -15,6 +15,7 @@ import {
 import { hash } from "../utils/hash.js";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
+import { profile_signup_webhook } from "../utils/webhooks.js";
 
 const WEB_CLIENT_ID = process.env.WEB_CLIENT_ID;
 const client = new OAuth2Client(WEB_CLIENT_ID);
@@ -30,7 +31,7 @@ const signup = async (req, res) => {
   // data-> email, firstname, lastname, bio, ... (phone)
 
   if (social) {
-    return await social_auth(social, { profile_id, res });
+    return await social_auth(social, { profile_id, res, data });
   }
 
   let Profiles = await PROFILES();
@@ -78,7 +79,7 @@ const signup = async (req, res) => {
       { _id: tried._id },
       {
         $set: { data },
-      }
+      },
     );
 
     return res.json({
@@ -232,6 +233,8 @@ const verify_profile = async (req, res) => {
     // Send welcome message to email.
     if (profile_usr.data.email) {
       await send_welcome_email({ profile_type, profile_usr: profile_usr.data });
+    } else {
+      await profile_signup_webhook(profile_type, profile_usr);
     }
 
     let Passwords = await PROFILE_PASSWORDS();
@@ -247,6 +250,8 @@ const verify_profile = async (req, res) => {
 };
 
 const send_welcome_email = async ({ profile_type, profile_usr }) => {
+  await profile_signup_webhook(profile_type, profile_usr);
+
   let platform = await (await USERS()).findOne({ _id: profile_type.platform });
 
   let args = {
@@ -265,7 +270,7 @@ const send_welcome_email = async ({ profile_type, profile_usr }) => {
       (args.user_name
         ? "welcome:branded-support"
         : "welcome:branded-no-username"),
-    platform.fullname
+    platform.fullname,
   );
 };
 
@@ -277,7 +282,7 @@ const update_profile_password = async (req, res) => {
   let result = await Passwords.updateOne(
     { _id: profile },
     { $set: { key: hash(password) } },
-    { upsert: true }
+    { upsert: true },
   );
 
   let ok = !!(result.modifiedCount || result.upsertedCount);
@@ -295,7 +300,7 @@ const update_profile_password = async (req, res) => {
         brand_name: platform_data.fullname,
       },
       "password_reset:branded_successful",
-      platform_data.fullname
+      platform_data.fullname,
     );
   }
 
@@ -308,7 +313,7 @@ const update_profile_password = async (req, res) => {
   });
 };
 
-const social_auth = async (social, { profile_id, res }) => {
+const social_auth = async (social, { profile_id, res, data }) => {
   let Profiles = await PROFILES();
 
   try {
@@ -341,6 +346,7 @@ const social_auth = async (social, { profile_id, res }) => {
 
     // Object for insert-on-new-profile
     const obj = {
+      ...data,
       firstname,
       lastname,
       image: picture,
@@ -362,7 +368,7 @@ const social_auth = async (social, { profile_id, res }) => {
         result = await Profiles.findOneAndUpdate(
           { email, profile: profile_id },
           { $set: updateObj },
-          { returnDocument: "after" }
+          { returnDocument: "after" },
         );
       } else {
         // Nothing to update, just return existing
@@ -475,7 +481,7 @@ const get_profile = async (req, res) => {
       : {
           $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
           profile: profile_type,
-        }
+        },
   );
 
   res.json({
@@ -670,7 +676,7 @@ const verify_email_or_phone = async (req, res) => {
       await PROFILES()
     ).updateOne(
       { _id: profile_user },
-      { $addToSet: { verified: verification_means } }
+      { $addToSet: { verified: verification_means } },
     );
   }
 
