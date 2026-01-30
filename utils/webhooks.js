@@ -1,4 +1,4 @@
-import { SETTINGS } from "../ds/folders";
+import { SETTINGS } from "../ds/folders.js";
 
 const profile_signup_webhook = async (profile_type, user_profile) => {
   let settings = await (
