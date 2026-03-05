@@ -17,21 +17,30 @@ import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import { profile_signup_webhook } from "../utils/webhooks.js";
 
-const WEB_CLIENT_ID = process.env.WEB_CLIENT_ID;
-const client = new OAuth2Client(WEB_CLIENT_ID);
+const WEB_CLIENT_ID_ANDROID = process.env.WEB_CLIENT_ID_ANDROID;
+const WEB_CLIENT_ID_IOS = process.env.WEB_CLIENT_ID_IOS;
+const client_android = new OAuth2Client(WEB_CLIENT_ID_ANDROID);
+const client_ios = new OAuth2Client(WEB_CLIENT_ID_IOS);
 
 const VERIFICATION_MEANS = { email: "email", phone: "phone" };
 
 const signup = async (req, res) => {
-  let { platform, profile_id, data, password, verification_means, social } =
-    req.body;
+  let {
+    platform,
+    profile_id,
+    data,
+    password,
+    meta,
+    verification_means,
+    social,
+  } = req.body;
   verification_means = VERIFICATION_MEANS[verification_means || "email"];
 
   console.log(platform, profile_id, data, password);
   // data-> email, firstname, lastname, bio, ... (phone)
 
   if (social) {
-    return await social_auth(social, { profile_id, res, data });
+    return await social_auth(social, { profile_id, res, data, meta });
   }
 
   let Profiles = await PROFILES();
@@ -313,14 +322,19 @@ const update_profile_password = async (req, res) => {
   });
 };
 
-const social_auth = async (social, { profile_id, res, data }) => {
+const social_auth = async (social, { profile_id, res, data, meta }) => {
   let Profiles = await PROFILES();
 
+  console.log(social);
+
   try {
+    let os = meta?.os || "android";
     // 1. Verify Google ID token
-    const ticket = await client.verifyIdToken({
+    const ticket = await (
+      os === "ios" ? client_ios : client_android
+    ).verifyIdToken({
       idToken: social.idToken,
-      audience: WEB_CLIENT_ID,
+      audience: os === "ios" ? WEB_CLIENT_ID_IOS : WEB_CLIENT_ID_ANDROID,
     });
 
     const payload = ticket.getPayload();
@@ -420,11 +434,11 @@ const social_auth = async (social, { profile_id, res, data }) => {
 };
 
 const signin = async (req, res) => {
-  let { email, password, profile: profile_id, phone, social } = req.body;
+  let { email, password, profile: profile_id, phone, social, meta } = req.body;
 
   let Profiles = await PROFILES();
   if (social) {
-    return await social_auth(social, { res, profile_id });
+    return await social_auth(social, { res, profile_id, meta });
   }
 
   if (email) email = email.trim().toLowerCase();
