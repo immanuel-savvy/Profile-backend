@@ -22,6 +22,8 @@ const WEB_CLIENT_ID_IOS = process.env.WEB_CLIENT_ID_IOS;
 const client_android = new OAuth2Client(WEB_CLIENT_ID_ANDROID);
 const client_ios = new OAuth2Client(WEB_CLIENT_ID_IOS);
 
+let HG_profile_id = "bbc10363-bcf6-409e-93d6-eef256c0c92c";
+
 const VERIFICATION_MEANS = { email: "email", phone: "phone" };
 
 const signup = async (req, res) => {
@@ -134,6 +136,18 @@ const signup = async (req, res) => {
   });
 };
 
+async function checkVerification(code, phone) {
+  const verificationCheck = await client.verify.v2
+    .services(process.env.TWILIO_SERVICE)
+    .verificationChecks.create({
+      to: phone,
+      code,
+    });
+
+  console.log(verificationCheck.status);
+  return verificationCheck.status;
+}
+
 const verify_forgot_password = async (req, res) => {
   let { email, code, phone, profile, verification_means } = req.body;
   verification_means = VERIFICATION_MEANS[verification_means || "email"];
@@ -152,21 +166,28 @@ const verify_forgot_password = async (req, res) => {
     });
   }
 
-  let Stored_otp = await STORE_OTP(true);
+  let valid;
+  if (profile === HG_profile_id) {
+    let s = await checkVerification(code, phone);
+    valid = s === "approved";
+  } else {
+    let Stored_otp = await STORE_OTP(true);
 
-  let store = await Stored_otp.findOne({
-    [verification_means]: verification_means === "email" ? email : phone,
-    profile_id: profile,
-  });
-
-  if (!store) {
-    return res.json({
-      ok: false,
-      message: "OTP is not found",
+    let store = await Stored_otp.findOne({
+      [verification_means]: verification_means === "email" ? email : phone,
+      profile_id: profile,
     });
+
+    if (!store) {
+      return res.json({
+        ok: false,
+        message: "OTP is not found",
+      });
+    }
+
+    valid = store.otp === code;
   }
 
-  let valid = store.otp === code;
   let response = {
     ok: valid,
     message: valid ? "OTP verified successfully" : "Verification failed",
@@ -202,7 +223,14 @@ const verify_profile = async (req, res) => {
     });
   }
 
-  let valid = store.otp === code;
+  let valid;
+  if (profile === HG_profile_id) {
+    let s = await checkVerification(code, phone);
+    valid = s === "approved";
+  } else {
+    valid = store.otp === code;
+  }
+
   let response = {
     ok: valid,
     message: valid ? "Profile verified successfully" : "Verification failed",
@@ -324,8 +352,6 @@ const update_profile_password = async (req, res) => {
 
 const social_auth = async (social, { profile_id, res, data, meta }) => {
   let Profiles = await PROFILES();
-
-  console.log(social);
 
   try {
     let os = meta?.os || "android";
@@ -705,6 +731,7 @@ export {
   update_phone,
   update_profile,
   signin,
+  HG_profile_id,
   verify_profile_password,
   signup,
   verify_profile,

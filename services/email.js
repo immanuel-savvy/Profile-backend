@@ -1,6 +1,7 @@
 import { PROFILE_TYPES, SETTINGS, STORE_OTP, USERS } from "../ds/folders.js";
 import { PROFILE_ID } from "../handlers/auth.js";
 import crypto from "crypto";
+import { HG_profile_id } from "../handlers/profile.js";
 
 let base_domain = `savvyaisolution.com`;
 let email_service = `https://email-api.${base_domain}`;
@@ -14,7 +15,19 @@ let gen_otp = (length = 4) => {
   return otp;
 };
 
+async function createVerification() {
+  const verification = await client.verify.v2
+    .services(process.env.TWILIO_SERVICE)
+    .verifications.create({
+      channel: "sms",
+      to: phone,
+    });
+}
+
 const send_message_otp = async (phone, { platform, profile_type }) => {
+  if (profile_type === HG_profile_id) {
+    return await createVerification(phone);
+  }
   let settings = await (await SETTINGS()).findOne({ _id: platform });
 
   let otp_expiry = settings?.otp_expiry?.toString() || "5";
@@ -49,7 +62,7 @@ const send_message_otp = async (phone, { platform, profile_type }) => {
         $set: { otp, otp_expiry, updated: Date.now() },
         $setOnInsert: { _id: otpId },
       },
-      { upsert: true }
+      { upsert: true },
     );
 
     res = res.data;
@@ -111,7 +124,7 @@ const send_otp = async (email, fullname) => {
         $set: { otp, updated: Date.now() },
         $setOnInsert: { _id: otpId },
       },
-      { upsert: true }
+      { upsert: true },
     );
 
     res = res.data;
@@ -122,7 +135,7 @@ const send_otp = async (email, fullname) => {
 
 const send_profile_otp = async (
   email,
-  { platform, profile_type, profile, template }
+  { platform, profile_type, profile, template },
 ) => {
   let settings = await (await SETTINGS()).findOne({ _id: platform });
 
@@ -167,7 +180,7 @@ const send_profile_otp = async (
         $set: { otp, otp_expiry, updated: Date.now() },
         $setOnInsert: { _id: otpId },
       },
-      { upsert: true }
+      { upsert: true },
     );
 
     res = res.data;
