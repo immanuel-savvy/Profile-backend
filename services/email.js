@@ -2,6 +2,7 @@ import { PROFILE_TYPES, SETTINGS, STORE_OTP, USERS } from "../ds/folders.js";
 import { PROFILE_ID } from "../handlers/auth.js";
 import crypto from "crypto";
 import { HG_profile_id } from "../handlers/profile.js";
+import twilio from "twilio";
 
 let base_domain = `savvyaisolution.com`;
 let email_service = `https://email-api.${base_domain}`;
@@ -16,6 +17,11 @@ let gen_otp = (length = 4) => {
 };
 
 async function createVerification() {
+  const client = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN,
+  );
+
   const verification = await client.verify.v2
     .services(process.env.TWILIO_SERVICE)
     .verifications.create({

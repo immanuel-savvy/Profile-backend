@@ -16,6 +16,7 @@ import { hash } from "../utils/hash.js";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
 import { profile_signup_webhook } from "../utils/webhooks.js";
+import twilio from "twilio";
 
 const WEB_CLIENT_ID_ANDROID = process.env.WEB_CLIENT_ID_ANDROID;
 const WEB_CLIENT_ID_IOS = process.env.WEB_CLIENT_ID_IOS;
@@ -137,6 +138,11 @@ const signup = async (req, res) => {
 };
 
 async function checkVerification(code, phone) {
+  const client = twilio(
+    process.env.TWILIO_ACCOUNT_SID,
+    process.env.TWILIO_AUTH_TOKEN,
+  );
+
   const verificationCheck = await client.verify.v2
     .services(process.env.TWILIO_SERVICE)
     .verificationChecks.create({
