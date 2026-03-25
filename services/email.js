@@ -16,7 +16,7 @@ let gen_otp = (length = 4) => {
   return otp;
 };
 
-async function createVerification() {
+async function createVerification(phone) {
   const client = twilio(
     process.env.TWILIO_ACCOUNT_SID,
     process.env.TWILIO_AUTH_TOKEN,
