@@ -1,5 +1,5 @@
-import { PROFILE_TYPES, PROFILES, SETTINGS } from "../ds/folders.js";
-import pagination from "../utils/pagination.js";
+import { PROFILE_TYPES, PROFILES, SETTINGS } from "../../ds/folders.js";
+import pagination from "../../utils/pagination.js";
 import crypto from "crypto";
 
 const new_profile_type = async (req, res) => {
@@ -38,7 +38,7 @@ const update_profile_type = async (req, res) => {
 
   let response = await Profile_types.updateOne(
     { type, platform },
-    { $set: { [property]: value } }
+    { $set: { [property]: value } },
   );
 
   res.json({
@@ -51,8 +51,8 @@ const update_profile_type = async (req, res) => {
       response.modifiedCount || response.upsertedCount
         ? "Profile updated"
         : response.matchedCount
-        ? "No changes"
-        : "Profile not found!",
+          ? "No changes"
+          : "Profile not found!",
     data: { [property]: value },
   });
 };

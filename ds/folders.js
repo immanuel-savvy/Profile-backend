@@ -6,6 +6,30 @@ const USERS = async () => {
   return fold;
 };
 
+const PROFILES_MAP = async () => {
+  let fold = await DB().collection("Profiles_map");
+
+  return fold;
+};
+
+const SESSIONS = async () => {
+  let fold = await DB().collection("Sessions");
+
+  return fold;
+};
+
+const TOKENS = async () => {
+  let fold = await DB().collection("Tokens");
+
+  return fold;
+};
+
+const OTPS = async (sub) => {
+  let fold = await DB().collection(`OTPS:${sub || "general"}`);
+
+  return fold;
+};
+
 const PENDING_USERS = async () => {
   let fold = await DB().collection("Pending_users");
 
@@ -59,9 +83,13 @@ export {
   PENDING_USERS,
   STORE_OTP,
   SETTINGS,
+  PROFILES_MAP,
   PASSWORDS,
   PROFILES,
+  OTPS,
   PROFILE_TYPES,
+  TOKENS,
   PENDING_PROFILES,
+  SESSIONS,
   PROFILE_PASSWORDS,
 };

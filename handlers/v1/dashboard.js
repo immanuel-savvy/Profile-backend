@@ -1,5 +1,5 @@
-import { PROFILES } from "../ds/folders.js";
-import pagination from "../utils/pagination.js";
+import { PROFILES } from "../../ds/folders.js";
+import pagination from "../../utils/pagination.js";
 
 const user_profiles = async (req, res) => {
   let { email, skip } = req.body,

@@ -1,4 +1,12 @@
-import { PROFILES } from "./ds/folders.js";
+import { boots, create_profiles } from "./boots.js";
+import {
+  PROFILE_TYPES,
+  PROFILES,
+  SESSIONS,
+  TOKENS,
+  USERS,
+} from "./ds/folders.js";
+import { Platform_profile_type_id } from "./handlers/v2/platform.js";
 import handler from "./Profile.js";
 import http from "http";
 
@@ -7,13 +15,16 @@ let server = http.createServer(handler);
 let port = process.env.PORT || 4000;
 
 server.listen(port, async () => {
-  // console.log(
-  //   await (
-  //     await PROFILES()
-  //   ).deleteMany({
-  //     profile: "bbc10363-bcf6-409e-93d6-eef256c0c92c",
-  //     phone: "+2349074991739",
-  //   }),
-  // );
+  // await (await PROFILE_TYPES()).deleteOne({ _id: Platform_profile_type_id });
+
+  await boots();
+
+  await create_profiles();
+
+  let Users = await USERS();
+  // await Users.deleteMany({ email: "immanuelsavvy@gmail.com" });
+
+  // let Profiles = await PROFILES();
+
   console.log(`Profile API is listening on http://localhost:${port}`);
 });

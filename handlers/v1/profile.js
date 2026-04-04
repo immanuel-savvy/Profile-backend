@@ -6,16 +6,16 @@ import {
   SETTINGS,
   STORE_OTP,
   USERS,
-} from "../ds/folders.js";
+} from "../../ds/folders.js";
 import {
   send_mail,
   send_message_otp,
   send_profile_otp,
-} from "../services/email.js";
-import { hash } from "../utils/hash.js";
+} from "../../services/email.js";
+import { hash } from "../../utils/hash.js";
 import crypto from "crypto";
 import { OAuth2Client } from "google-auth-library";
-import { profile_signup_webhook } from "../utils/webhooks.js";
+import { profile_signup_webhook } from "../../utils/webhooks.js";
 import twilio from "twilio";
 
 const WEB_CLIENT_ID_ANDROID = process.env.WEB_CLIENT_ID_ANDROID;

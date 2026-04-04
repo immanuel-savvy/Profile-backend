@@ -10,7 +10,7 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-import router from "./routes.js";
+import version_middleware from "./version_control.js";
 
 const app = express();
 
@@ -23,6 +23,6 @@ app.get("/", async (req, res) => {
   res.send("Welcome to Profile API");
 });
 
-router(app);
+version_middleware(app);
 
 export default app;

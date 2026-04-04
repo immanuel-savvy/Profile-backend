@@ -1,6 +1,16 @@
-import { PASSWORDS, PENDING_USERS, STORE_OTP, USERS } from "../ds/folders.js";
-import { base_domain, FROM, send_mail, send_otp } from "../services/email.js";
-import { hash } from "../utils/hash.js";
+import {
+  PASSWORDS,
+  PENDING_USERS,
+  STORE_OTP,
+  USERS,
+} from "../../ds/folders.js";
+import {
+  base_domain,
+  FROM,
+  send_mail,
+  send_otp,
+} from "../../services/email.js";
+import { hash } from "../../utils/hash.js";
 import crypto from "crypto";
 
 const PROFILE_ID = "profile-savvyaisolution",
@@ -22,7 +32,7 @@ const register = async (req, res) => {
       { _id: tried._id },
       {
         $set: data,
-      }
+      },
     );
 
     return res.json({
@@ -114,7 +124,7 @@ const verify = async (req, res) => {
         support_email: `profile-support@savvyaisolution.com`,
         dashboard_link: `https://profile.${base_domain}/dashboard?platform_token=${userId}`,
       },
-      "welcome:branded-support"
+      "welcome:branded-support",
     );
 
     let Passwords = await PASSWORDS();
