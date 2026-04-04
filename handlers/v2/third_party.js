@@ -31,6 +31,9 @@ const get_token = async (req, res) => {
 
   let platform_doc = await (await USERS()).findOne({ uri: platform_uri });
 
+  console.log(platform_doc, "platform doc for token request");
+  console.log(profile, "profile for token request");
+  console.log(platform, "platform for token request");
   let sess = await (
     await SESSIONS()
   ).findOne({
@@ -38,6 +41,15 @@ const get_token = async (req, res) => {
     platform_profile: profile,
     third_party_platform: platform._id,
   });
+
+  console.log(sess, "session found for token request");
+
+  if (!sess) {
+    return res.json({
+      ok: false,
+      message: "No session found for this profile and platform",
+    });
+  }
 
   return res.json({
     ok: true,
