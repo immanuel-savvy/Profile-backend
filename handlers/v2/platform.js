@@ -10,10 +10,8 @@ import {
 import crypto from "crypto";
 import { hash } from "../../utils/hash.js";
 import { retrieve_setting, email_auth } from "./profiles.js";
+import { email_service } from "../../services/email.js";
 
-let email_service = !process.env.PROD
-  ? "http://localhost:4003"
-  : "email-api.savvyaisolution.com"; // email service url
 let Platform_profile_type_id = "platform_profile_type_id"; // profile type id for platforms
 
 export { Platform_profile_type_id };
