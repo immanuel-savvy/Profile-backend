@@ -11,7 +11,6 @@ import crypto from "crypto";
 import { hash } from "../../utils/hash.js";
 import { retrieve_setting, email_auth } from "./profiles.js";
 import { email_service } from "../../services/email.js";
-import { send } from "process";
 
 let Platform_profile_type_id = "platform_profile_type_id"; // profile type id for platforms
 
