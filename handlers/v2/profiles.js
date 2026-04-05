@@ -735,6 +735,7 @@ const profile_forgot_password = async (req, res) => {
         _id: crypto.randomUUID(),
         user: user._id,
         token: resetToken,
+        expiry: reset_password_setting.expiry || OTP_expiry,
         platform: platform._id,
         profile,
         created: new Date(),
@@ -755,7 +756,10 @@ const profile_forgot_password = async (req, res) => {
               variables: {
                 profile: user,
                 platform,
-                reset_link: `${reset_password_setting?.reset_password_url}?token=${resetToken}`,
+                reset: {
+                  link: `${reset_password_setting?.reset_password_url}?token=${resetToken}`,
+                  expiry: reset_password_setting?.expiry,
+                },
               },
             },
           },
@@ -790,7 +794,11 @@ const profile_forgot_password = async (req, res) => {
       });
     } else {
       // 🔐 Generate OTP
-      const otp = await generate_otp([user.email, user.phone], profile);
+      const otp = await generate_otp(
+        [user.email, user.phone],
+        profile,
+        reset_password_setting?.expiry || OTP_expiry,
+      );
 
       let template =
         reset_password_setting?.forgot_password_template ||
@@ -808,7 +816,7 @@ const profile_forgot_password = async (req, res) => {
               variables: {
                 profile: user,
                 platform,
-                otp: { code: otp, expiry_time: OTP_expiry },
+                otp: { code: otp, expiry_time: reset_password_setting?.expiry },
               },
             },
           },
@@ -826,7 +834,7 @@ const profile_forgot_password = async (req, res) => {
             content: {
               profile: user,
               platform,
-              otp: { code: otp, expiry_time: OTP_expiry },
+              otp: { code: otp, expiry_time: reset_password_setting?.expiry },
             },
           },
           await (await PROFILES()).findOne({ _id: platform._id }),
@@ -851,7 +859,40 @@ const profile_forgot_password = async (req, res) => {
 const profile_verify_forgot_password = async (req, res) => {
   try {
     let platform = req.headers.platform;
-    let { email, phone, code, profile, new_password } = req.body;
+    let { email, phone, code, token, profile, new_password } = req.body;
+
+    if (token) {
+      let rest = await (await RESET_TOKENS()).findOne({ token });
+      if (!rest) {
+        return res.json({
+          ok: false,
+          message: "Invalid reset token",
+        });
+      }
+
+      if (
+        new Date(rest.updatedAt).getTime() + rest.expiry * 1000 * 60 <
+        Date.now()
+      ) {
+        return res.json({
+          ok: false,
+          message: "Reset token has expired",
+        });
+      }
+
+      await (
+        await PASSWORDS()
+      ).updateOne(
+        { _id: rest.user },
+        { $set: { key: hash(new_password), updated: new Date() } },
+        { upsert: true },
+      );
+
+      return res.json({
+        ok: true,
+        message: "Password reset successful",
+      });
+    }
 
     let collection = await OTPS(profile);
     let identifiers = [email, phone].filter(Boolean);
@@ -877,7 +918,7 @@ const profile_verify_forgot_password = async (req, res) => {
 
     // ⏳ Expiry check
     if (
-      new Date(otp.updatedAt).getTime() + OTP_expiry * 1000 * 60 <
+      new Date(otp.updatedAt).getTime() + otp.expiry * 1000 * 60 <
       Date.now()
     ) {
       return res.json({

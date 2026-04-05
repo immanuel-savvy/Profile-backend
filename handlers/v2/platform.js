@@ -43,7 +43,7 @@ const send_mail = async ({ from, to, content }, platform) => {
   return res;
 };
 
-const generate_otp = async (id, sub) => {
+const generate_otp = async (id, sub, expiry) => {
   const collection = await OTPS(sub);
 
   const code = crypto.randomInt(100000, 999999).toString();
@@ -53,6 +53,7 @@ const generate_otp = async (id, sub) => {
     {
       $set: {
         code,
+        expiry,
         updatedAt: new Date(),
       },
       $setOnInsert: {
