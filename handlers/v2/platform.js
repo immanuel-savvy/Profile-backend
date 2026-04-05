@@ -9,7 +9,7 @@ import {
 } from "../../ds/folders.js";
 import crypto from "crypto";
 import { hash } from "../../utils/hash.js";
-import { retrieve_setting, email_auth } from "./profiles.js";
+import { retrieve_setting, service_auth } from "./profiles.js";
 import { email_service } from "../../services/email.js";
 
 let Platform_profile_type_id = "platform_profile_type_id"; // profile type id for platforms
@@ -17,7 +17,7 @@ let Platform_profile_type_id = "platform_profile_type_id"; // profile type id fo
 export { Platform_profile_type_id };
 
 const send_mail = async ({ from, to, content }, platform) => {
-  let auth = await email_auth(platform);
+  let auth = await service_auth(platform, "aimail.savvyaisolution.com");
   if (!auth) {
     return;
   }
@@ -208,6 +208,14 @@ const verify_platform = async (req, res) => {
     await PROFILES()
   ).insertOne({ ...platform, profile: Platform_profile_type_id });
   await (await PASSWORDS()).insertOne({ _id: platform._id, key: pass });
+
+  await (
+    await TOKENS()
+  ).insertOne({
+    _id: crypto.randomUUID(),
+    user: platform._id,
+    token: crypto.randomBytes(32).toString("hex"),
+  });
 
   await send_mail(
     {

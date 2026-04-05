@@ -38,6 +38,8 @@ const version_middleware = (app) => {
       if (api_key) {
         let Tokens = await TOKENS();
         ress = await Tokens.findOne({ token: api_key });
+        console.log(api_key);
+        console.log(ress);
         if (!ress)
           return res.status(403).json({
             error: "Invalid api keys",

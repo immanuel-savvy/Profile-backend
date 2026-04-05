@@ -78,10 +78,17 @@ const SETTINGS = async () => {
   return fold;
 };
 
+const RESET_TOKENS = async () => {
+  let fold = await DB().collection("reset_tokens");
+
+  return fold;
+};
+
 export {
   USERS,
   PENDING_USERS,
   STORE_OTP,
+  RESET_TOKENS,
   SETTINGS,
   PROFILES_MAP,
   PASSWORDS,

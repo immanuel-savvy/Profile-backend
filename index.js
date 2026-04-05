@@ -24,6 +24,9 @@ server.listen(port, async () => {
   let Users = await USERS();
   // await Users.deleteMany({ email: "immanuelsavvy@gmail.com" });
 
+  console.log(
+    await (await TOKENS()).findOne({ token: "token_value_email_001" }),
+  );
   // let Profiles = await PROFILES();
 
   console.log(`Profile API is listening on http://localhost:${port}`);

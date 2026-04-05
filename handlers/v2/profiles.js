@@ -3,6 +3,7 @@ import {
   PASSWORDS,
   PENDING_PROFILES,
   PROFILES,
+  RESET_TOKENS,
   SESSIONS,
   USERS,
 } from "../../ds/folders.js";
@@ -11,24 +12,22 @@ import crypto from "crypto";
 import { generate_otp, OTP_expiry, send_mail } from "./platform.js";
 import { email_service, settings_service } from "../../services/email.js";
 
-const settings_auth = async (profile) => {
-  let platform = await (
-    await USERS()
-  ).findOne({ uri: "settings.savvyaisolution.com" });
+const service_auth = async (profile, uri) => {
+  let platform = await (await USERS()).findOne({ uri });
 
   let sess = await (
     await SESSIONS()
   ).findOne({
     platform: platform._id,
     platform_profile: profile._id,
-    third_party_platform: profile.platform,
+    third_party_platform: profile.platform || profile._id,
   });
 
   return sess?.token;
 };
 
 const retrieve_setting = async (profile) => {
-  let auth = await settings_auth(profile);
+  let auth = await service_auth(profile, "settings.savvyaisolution.com");
   if (!auth) return;
 
   try {
@@ -52,29 +51,13 @@ const retrieve_setting = async (profile) => {
   }
 };
 
-const email_auth = async (profile) => {
-  let platform = await (
-    await USERS()
-  ).findOne({ uri: "aimail.savvyaisolution.com" });
-
-  let sess = await (
-    await SESSIONS()
-  ).findOne({
-    platform: platform._id,
-    platform_profile: profile._id,
-    third_party_platform: profile.platform,
-  });
-
-  return sess?.token;
-};
-
-export { email_auth };
+export { service_auth };
 
 const send_message = async (
   { phone, content, category, template },
   profile,
 ) => {
-  let auth = await email_auth(profile);
+  let auth = await service_auth(profile, "aimail.savvyaisolution.com");
 
   if (!auth) return;
 
@@ -651,7 +634,7 @@ const resend_profile_otp = async (req, res) => {
       "signup_otp";
 
     // 📧 Send email
-    if (user.email) {
+    if (uids?.properties?.includes("email") && user.email) {
       await send_mail(
         {
           from: { name: platform.name },
@@ -671,7 +654,7 @@ const resend_profile_otp = async (req, res) => {
     }
 
     // 📱 Send SMS
-    if (user.phone) {
+    if (uids?.properties?.includes("phone") && user.phone) {
       await send_message(
         {
           phone: user.phone,
@@ -739,56 +722,123 @@ const profile_forgot_password = async (req, res) => {
       });
     }
 
-    // 🔐 Generate OTP
-    const otp = await generate_otp([user.email, user.phone], profile);
+    let settings = await retrieve_setting(platform);
+    let reset_password_setting =
+      settings?.[profile]?.forgot_password || settings?.forgot_password;
 
-    let template =
-      setting?.[profile]?.forgot_password_template ||
-      setting?.forgot_password_template ||
-      "forgot_password_otp";
+    if (reset_password_setting?.reset_password_url) {
+      // 🔐 Generate reset token
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      await (
+        await RESET_TOKENS()
+      ).insertOne({
+        _id: crypto.randomUUID(),
+        user: user._id,
+        token: resetToken,
+        platform: platform._id,
+        profile,
+        created: new Date(),
+      });
 
-    // 📧 Send email
-    if (user.email) {
-      await send_mail(
-        {
-          from: { name: platform.name },
-          to: user.email,
-          content: {
+      let template =
+        reset_password_setting?.reset_link_template || "forgot_password_link";
+
+      // 📧 Send email
+      if (uids?.properties?.includes("email") && user.email) {
+        await send_mail(
+          {
+            from: { name: platform.name },
+            to: user.email,
+            content: {
+              template,
+              category: "verification",
+              variables: {
+                profile: user,
+                platform,
+                reset_link: `${reset_password_setting?.reset_password_url}?token=${resetToken}`,
+              },
+            },
+          },
+          await (await PROFILES()).findOne({ _id: platform._id }),
+        );
+      }
+
+      // 📱 Send SMS
+      if (uids?.properties?.includes("phone") && user.phone) {
+        await send_message(
+          {
+            phone: user.phone,
             template,
             category: "verification",
-            variables: {
+            content: {
+              profile: user,
+              platform,
+              reset_link: `${reset_password_setting?.reset_password_url}?token=${resetToken}`,
+            },
+          },
+          await (await PROFILES()).findOne({ _id: platform._id }),
+        );
+      }
+
+      return res.json({
+        ok: true,
+        message: "Password reset link sent",
+        data: {
+          email: user.email,
+          reset_link: `${reset_password_setting?.reset_password_url}?token=${resetToken}`,
+        },
+      });
+    } else {
+      // 🔐 Generate OTP
+      const otp = await generate_otp([user.email, user.phone], profile);
+
+      let template =
+        reset_password_setting?.forgot_password_template ||
+        "forgot_password_otp";
+
+      // 📧 Send email
+      if (user.email) {
+        await send_mail(
+          {
+            from: { name: platform.name },
+            to: user.email,
+            content: {
+              template,
+              category: "verification",
+              variables: {
+                profile: user,
+                platform,
+                otp: { code: otp, expiry_time: OTP_expiry },
+              },
+            },
+          },
+          await (await PROFILES()).findOne({ _id: platform._id }),
+        );
+      }
+
+      // 📱 Send SMS
+      if (user.phone) {
+        await send_message(
+          {
+            phone: user.phone,
+            template,
+            category: "verification",
+            content: {
               profile: user,
               platform,
               otp: { code: otp, expiry_time: OTP_expiry },
             },
           },
-        },
-        await (await PROFILES()).findOne({ _id: platform._id }),
-      );
-    }
+          await (await PROFILES()).findOne({ _id: platform._id }),
+        );
+      }
 
-    // 📱 Send SMS
-    if (user.phone) {
-      await send_message(
-        {
-          phone: user.phone,
-          template,
-          category: "verification",
-          content: {
-            profile: user,
-            platform,
-            otp: { code: otp, expiry_time: OTP_expiry },
-          },
-        },
-        await (await PROFILES()).findOne({ _id: platform._id }),
-      );
+      return res.json({
+        ok: true,
+        message: "OTP sent for password reset",
+        data: { email: user.email },
+      });
     }
-
-    return res.json({
-      ok: true,
-      message: "OTP sent for password reset",
-      data: { email: user.email },
-    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({
