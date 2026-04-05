@@ -12,9 +12,16 @@ import crypto from "crypto";
 import { generate_otp, OTP_expiry, send_mail } from "./platform.js";
 import { email_service, settings_service } from "../../services/email.js";
 
+const get_platform_profile = async (platform) => {
+  let profile = await (await PROFILES()).findOne({ _id: platform._id });
+
+  return profile;
+};
+
 const service_auth = async (profile, uri) => {
   let platform = await (await USERS()).findOne({ uri });
 
+  console.log(platform, "HEY?", profile);
   let sess = await (
     await SESSIONS()
   ).findOne({
@@ -153,13 +160,14 @@ const create_profile = async ({ platform, details, type }) => {
 
   const profile_details = result.value || result;
 
-  // 🔐 Generate OTP
-  const otp = await generate_otp(profile_details.email, type);
+  let verification_setting =
+    setting?.[type]?.verification || setting?.verification;
 
-  let template =
-    setting?.[type]?.verification_template ||
-    setting?.verification_template ||
-    "signup_otp";
+  // 🔐 Generate OTP
+  const otp = await generate_otp(profile_details.email, type, {
+    expiry: verification_setting?.expiry || OTP_expiry,
+    length: verification_setting?.length || 6,
+  });
 
   // 📧 Email
   if (uids.properties.includes("email") && details.email) {
@@ -168,7 +176,7 @@ const create_profile = async ({ platform, details, type }) => {
         from: { name: platform.name },
         to: details.email,
         content: {
-          template,
+          template: "signup_otp",
           category: "verification",
           variables: {
             profile: { name: profile_details.fullname },
@@ -177,7 +185,7 @@ const create_profile = async ({ platform, details, type }) => {
           },
         },
       },
-      await (await PROFILES()).findOne({ _id: platform._id }),
+      await get_platform_profile(platform),
     );
   }
 
@@ -194,7 +202,7 @@ const create_profile = async ({ platform, details, type }) => {
           otp: { code: otp, expiry_time: OTP_expiry },
         },
       },
-      await (await PROFILES()).findOne({ _id: platform._id }),
+      await get_platform_profile(platform),
     );
   }
 
@@ -327,6 +335,23 @@ const verify_profile = async (req, res) => {
     await Pending.deleteOne({ _id: pendingProfile._id });
     await Otps.deleteOne({ _id: otpRecord._id });
 
+    if (finalProfile?.email)
+      await send_mail(
+        {
+          from: { name: platform.name },
+          to: finalProfile.email,
+          content: {
+            template: "welcome",
+            category: "onboarding",
+            variables: {
+              profile: finalProfile,
+              platform,
+            },
+          },
+        },
+        await get_platform_profile(platform),
+      );
+
     return res.json({
       ok: true,
       message: "Profile verified successfully",
@@ -406,19 +431,24 @@ const signin_user = async ({
       "two_factor_auth_otp";
 
     if (user.email) {
-      await send_mail({
-        from: { name: platform.name },
-        to: user.email,
-        content: {
-          template,
-          category: "verification",
-          variables: {
-            profile: user,
-            platform,
-            otp: { code: otp, expiry_time: OTP_expiry },
+      await send_mail(
+        {
+          from: { name: platform.name },
+          to: user.email,
+          content: {
+            template,
+            category: "verification",
+            variables: {
+              profile: {
+                ...user,
+              },
+              platform,
+              otp: { code: otp, expiry_time: OTP_expiry },
+            },
           },
         },
-      });
+        await get_platform_profile(platform),
+      );
     }
 
     if (user.phone) {
@@ -649,7 +679,7 @@ const resend_profile_otp = async (req, res) => {
             },
           },
         },
-        await (await PROFILES()).findOne({ _id: platform._id }),
+        await get_platform_profile(platform),
       );
     }
 
@@ -666,7 +696,7 @@ const resend_profile_otp = async (req, res) => {
             otp: { code: otp, expiry_time: OTP_expiry },
           },
         },
-        await (await PROFILES()).findOne({ _id: platform._id }),
+        await get_platform_profile(platform),
       );
     }
 
@@ -763,7 +793,7 @@ const profile_forgot_password = async (req, res) => {
               },
             },
           },
-          await (await PROFILES()).findOne({ _id: platform._id }),
+          await get_platform_profile(platform),
         );
       }
 
@@ -780,7 +810,7 @@ const profile_forgot_password = async (req, res) => {
               reset_link: `${reset_password_setting?.reset_password_url}?token=${resetToken}`,
             },
           },
-          await (await PROFILES()).findOne({ _id: platform._id }),
+          await get_platform_profile(platform),
         );
       }
 
@@ -794,11 +824,9 @@ const profile_forgot_password = async (req, res) => {
       });
     } else {
       // 🔐 Generate OTP
-      const otp = await generate_otp(
-        [user.email, user.phone],
-        profile,
-        reset_password_setting?.expiry || OTP_expiry,
-      );
+      const otp = await generate_otp([user.email, user.phone], profile, {
+        expiry: reset_password_setting?.expiry || OTP_expiry,
+      });
 
       let template =
         reset_password_setting?.forgot_password_template ||
@@ -820,7 +848,7 @@ const profile_forgot_password = async (req, res) => {
               },
             },
           },
-          await (await PROFILES()).findOne({ _id: platform._id }),
+          await get_platform_profile(platform),
         );
       }
 
@@ -837,7 +865,7 @@ const profile_forgot_password = async (req, res) => {
               otp: { code: otp, expiry_time: reset_password_setting?.expiry },
             },
           },
-          await (await PROFILES()).findOne({ _id: platform._id }),
+          await get_platform_profile(platform),
         );
       }
 

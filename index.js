@@ -1,4 +1,9 @@
-import { boots, create_profiles } from "./boots.js";
+import {
+  addjustment,
+  boots,
+  create_profiles,
+  email_setting_adjustment,
+} from "./boots.js";
 import {
   PROFILE_TYPES,
   PROFILES,
@@ -21,12 +26,17 @@ server.listen(port, async () => {
 
   await create_profiles();
 
+  // console.log(await (await PROFILES()).findOne({ _id: "usr_settings_001" }));
+  await addjustment();
+
+  await email_setting_adjustment();
+
   let Users = await USERS();
   // await Users.deleteMany({ email: "immanuelsavvy@gmail.com" });
 
-  console.log(
-    await (await TOKENS()).findOne({ token: "token_value_email_001" }),
-  );
+  // console.log(
+  //   await (await TOKENS()).findOne({ token: "token_value_email_001" }),
+  // );
   // let Profiles = await PROFILES();
 
   console.log(`Profile API is listening on http://localhost:${port}`);

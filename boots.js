@@ -106,7 +106,7 @@ let settings_profile = {
   created: new Date(),
   email: settings_user.email,
   platform: profile_user._id,
-  _id: ID_PROFILE_SETTINGS,
+  _id: settings_user._id,
   profile: profile_type._id,
 };
 
@@ -115,7 +115,7 @@ let email_profile = {
   email: email_user.email,
   created: new Date(),
   platform: profile_user._id,
-  _id: ID_PROFILE_EMAIL,
+  _id: email_user._id,
   profile: profile_type._id,
 };
 
@@ -124,10 +124,95 @@ let profile_profile = {
   email: profile_user.email,
   created: new Date(),
   platform: profile_user._id,
-  _id: ID_PROFILE_PROFILE,
+  _id: profile_user._id,
   profile: profile_type._id,
 };
 
+let setting_setting = {
+  name: settings_profile.name,
+  email: settings_user.email,
+  platform: settings_user._id,
+  profile: settings_profile_type._id,
+  created: new Date(),
+  _id: `Setting_${settings_profile._id}`,
+};
+
+let email_email = {
+  name: email_profile.name,
+  email: email_user.email,
+  platform: email_user._id,
+  profile: email_profile_type._id,
+  created: new Date(),
+  _id: `Email_${email_profile._id}`,
+};
+
+let settings_email = {
+  name: settings_profile.name,
+  email: settings_profile.email,
+  created: new Date(),
+  _id: `Email_${settings_profile._id}`,
+  platform: email_user._id,
+  profile: email_profile_type._id,
+};
+
+let email_settings = {
+  name: email_user.name,
+  email: email_user.email,
+  created: new Date(),
+  _id: `Setting_${email_user._id}`,
+  platform: settings_user._id,
+  profile: settings_profile_type._id,
+};
+
+const email_setting_adjustment = async () => {
+  let Profiles = await PROFILES();
+  console.log("Adding..");
+  if (await Profiles.findOne({ _id: settings_email._id })) {
+    return;
+  }
+  console.log("Actually adding..");
+
+  let prfs = [settings_email, email_settings];
+  await Profiles.insertMany(prfs);
+  await (
+    await PASSWORDS()
+  ).insertMany(
+    prfs.map((p) => {
+      return {
+        _id: p._id,
+        key: hash(p.name),
+        created: new Date(),
+      };
+    }),
+  );
+};
+
+export { email_setting_adjustment };
+
+const addjustment = async () => {
+  let Profiles = await PROFILES();
+  console.log("Adding..");
+  if (await Profiles.findOne({ _id: setting_setting._id })) {
+    return;
+  }
+  console.log("Actually adding..");
+
+  let prfs = [setting_setting, email_email];
+  await Profiles.insertMany(prfs);
+  await (
+    await PASSWORDS()
+  ).insertMany(
+    prfs.map((p) => {
+      return {
+        _id: p._id,
+        key: hash(p.name),
+        created: new Date(),
+      };
+    }),
+  );
+};
+
+export { addjustment };
 // Cross-platform profiles
 
 let profile_settings_profile = {
@@ -165,22 +250,22 @@ let email_settings_profile = {
 
 let passwords = [
   {
-    _id: ID_USER_PROFILE,
+    _id: profile_user._id,
     key: hash(profile_user.name),
     created: new Date(),
   },
   {
-    _id: ID_USER_EMAIL,
+    _id: email_user._id,
     key: hash(email_user.name),
     created: new Date(),
   },
   {
-    _id: ID_USER_SETTINGS,
+    _id: settings_user._id,
     key: hash(settings_user.name),
     created: new Date(),
   },
   {
-    _id: ID_PROFILE_PROFILE,
+    _id: profile_profile._id,
     key: hash(profile_profile.name),
     created: new Date(),
   },
@@ -188,17 +273,17 @@ let passwords = [
 
 let profiles_passwords = [
   {
-    _id: ID_PROFILE_SETTINGS_PROFILE,
+    _id: profile_settings_profile._id,
     key: hash(profile_settings_profile.name),
     created: new Date(),
   },
   {
-    _id: ID_PROFILE_EMAIL_PROFILE,
+    _id: profile_email_profile._id,
     key: hash(profile_email_profile.name),
     created: new Date(),
   },
   {
-    _id: ID_PROFILE_EMAIL_SETTINGS,
+    _id: email_settings_profile._id,
     key: hash(email_settings_profile.name),
     created: new Date(),
   },

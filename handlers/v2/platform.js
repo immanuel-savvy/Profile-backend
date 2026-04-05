@@ -18,8 +18,18 @@ export { Platform_profile_type_id };
 
 const send_mail = async ({ from, to, content }, platform) => {
   let auth = await service_auth(platform, "aimail.savvyaisolution.com");
+
+  console.log(auth, platform, "WHAT?");
   if (!auth) {
     return;
+  }
+
+  if (content?.variables?.profile) {
+    let profile = content.variables.profile;
+    content.variables.profile = {
+      ...profile,
+      name: `${profile.name || profile.fullname || `${profile.firstname} ${profile.lastname}`.trim()}`,
+    };
   }
 
   let res = await fetch(`${email_service}/send_mail`, {
@@ -43,10 +53,19 @@ const send_mail = async ({ from, to, content }, platform) => {
   return res;
 };
 
-const generate_otp = async (id, sub, expiry) => {
+const generate_otp = async (id, sub, opts = {}) => {
+  let { expiry = 5, length = 6 } = opts || {};
+
   const collection = await OTPS(sub);
 
-  const code = crypto.randomInt(100000, 999999).toString();
+  // Ensure valid length
+  if (length < 1) throw new Error("OTP length must be at least 1");
+
+  // Generate min and max dynamically
+  const min = 10 ** (length - 1);
+  const max = 10 ** length;
+
+  const code = crypto.randomInt(min, max).toString();
 
   await collection.updateOne(
     { id },
