@@ -42,7 +42,7 @@ const version_middleware = (app) => {
         console.log(ress);
         if (!ress)
           return res.status(403).json({
-            error: "Invalid api keys",
+            error: "Invalid api keys.",
           });
 
         let user = await (
