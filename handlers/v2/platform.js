@@ -11,6 +11,7 @@ import crypto from "crypto";
 import { hash } from "../../utils/hash.js";
 import { retrieve_setting, email_auth } from "./profiles.js";
 import { email_service } from "../../services/email.js";
+import { send } from "process";
 
 let Platform_profile_type_id = "platform_profile_type_id"; // profile type id for platforms
 
@@ -209,17 +210,20 @@ const verify_platform = async (req, res) => {
   ).insertOne({ ...platform, profile: Platform_profile_type_id });
   await (await PASSWORDS()).insertOne({ _id: platform._id, key: pass });
 
-  await send_mail({
-    from: { name: "Profile" },
-    to: platform.email,
-    content: {
-      template: "welcome",
-      category: "onboarding",
-      variables: {
-        profile: platform,
+  await send_mail(
+    {
+      from: { name: "Profile" },
+      to: platform.email,
+      content: {
+        template: "welcome",
+        category: "onboarding",
+        variables: {
+          profile: platform,
+        },
       },
     },
-  });
+    await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
+  );
 
   res.json({
     ok: true,
@@ -243,27 +247,30 @@ const resend_verification_otp = async (req, res) => {
 
   const otp = await generate_otp(email);
 
-  const mail_res = await send_mail({
-    from: { name: "Profile" },
-    to: email,
-    content: {
-      template: "signup_otp",
-      category: "verification",
-      variables: {
-        profile: { name: platform.name },
-        otp: {
-          code: otp,
-          expiry: OTP_expiry,
+  const mail_res = await send_mail(
+    {
+      from: { name: "Profile" },
+      to: email,
+      content: {
+        template: "signup_otp",
+        category: "verification",
+        variables: {
+          profile: { name: platform.name },
+          otp: {
+            code: otp,
+            expiry: OTP_expiry,
+          },
         },
       },
     },
-  });
+    await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
+  );
 
   return res.json({
-    ok: mail_res.ok,
+    ok: mail_res.ok || false,
     message: mail_res.ok
       ? "OTP resent to your email. Verify to continue."
-      : mail_res.message,
+      : mail_res.message || "Failed to resend OTP email",
   });
 };
 
@@ -281,27 +288,30 @@ const forgot_password = async (req, res) => {
 
   const otp = await generate_otp(email);
 
-  const mail_res = await send_mail({
-    from: { name: "Profile" },
-    to: email,
-    content: {
-      template: "forgot_password_otp",
-      category: "verification",
-      variables: {
-        profile: { name: user.name },
-        otp: {
-          code: otp,
-          expiry: OTP_expiry,
+  const mail_res = await send_mail(
+    {
+      from: { name: "Profile" },
+      to: email,
+      content: {
+        template: "forgot_password_otp",
+        category: "verification",
+        variables: {
+          profile: { name: user.name },
+          otp: {
+            code: otp,
+            expiry: OTP_expiry,
+          },
         },
       },
     },
-  });
+    await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
+  );
 
   return res.json({
-    ok: mail_res.ok,
+    ok: mail_res.ok || false,
     message: mail_res.ok
       ? "OTP sent to your email. Verify to continue."
-      : mail_res.message,
+      : mail_res.message || "Failed to send OTP email",
   });
 };
 
@@ -346,6 +356,21 @@ const verify_forgot_password_otp = async (req, res) => {
   await (
     await PASSWORDS()
   ).updateOne({ _id: user._id }, { $set: { key: hashedPassword } });
+
+  await send_mail(
+    {
+      from: { name: "Profile" },
+      to: email,
+      content: {
+        template: "password_updated",
+        category: "security",
+        variables: {
+          profile: { name: user.name },
+        },
+      },
+    },
+    await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
+  );
 
   return res.json({
     ok: true,
@@ -396,7 +421,7 @@ const login_platform = async (req, res) => {
           },
         },
       },
-      await (await PROFILES()).findOne({ _id: Profile_platform_profile_id }),
+      await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
     );
 
     return res.json({
