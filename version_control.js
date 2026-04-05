@@ -24,6 +24,7 @@ const version_middleware = (app) => {
       let api_key = req.headers["x-api-key"];
       // console.log("API Key:", api_key);
       let authorisation = req.headers["authorization"];
+
       authorisation = authorisation
         ? authorisation.replace("Bearer ", "")
         : null;
@@ -38,13 +39,12 @@ const version_middleware = (app) => {
       if (api_key) {
         let Tokens = await TOKENS();
         ress = await Tokens.findOne({ token: api_key });
-        console.log(api_key);
-        console.log(ress);
-        if (!ress)
+
+        if (!ress) {
           return res.status(403).json({
             error: "Invalid api keys.",
           });
-
+        }
         let user = await (
           await USERS()
         ).findOne({
@@ -60,6 +60,7 @@ const version_middleware = (app) => {
       }
 
       let xplatform = req.headers["x-platform"];
+
       if (!xplatform && authorisation) {
         let Tokens = await SESSIONS();
 

@@ -2,8 +2,6 @@ const validate = async (req, res) => {
   let platform = req.headers["platform"];
   let profile = req.headers["profile"];
 
-  console.log(platform, profile);
-
   return res.json({
     ok: true,
     message: "Validation successful",
