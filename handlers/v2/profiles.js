@@ -55,6 +55,7 @@ const retrieve_setting = async (profile, body) => {
 
     res = await res.json();
 
+    console.log(res, "HIII");
     return res?.ok ? res?.data : undefined;
   } catch (err) {
     console.error(err);
