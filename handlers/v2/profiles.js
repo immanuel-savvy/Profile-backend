@@ -13,21 +13,24 @@ import { generate_otp, OTP_expiry, send_mail } from "./platform.js";
 import { email_service, settings_service } from "../../services/email.js";
 
 const get_platform_profile = async (platform) => {
+  console.log(platform);
+
   let profile = await (await PROFILES()).findOne({ _id: platform._id });
 
   return profile;
 };
 
 const service_auth = async (profile, uri) => {
-  let platform = await (await USERS()).findOne({ uri });
+  if (!profile?.platform) profile = await get_platform_profile(profile);
 
+  let platform = await (await USERS()).findOne({ uri });
   console.log(platform, "HEY?", profile);
   let sess = await (
     await SESSIONS()
   ).findOne({
     platform: platform._id,
     platform_profile: profile._id,
-    third_party_platform: profile.platform || profile._id,
+    third_party_platform: profile.platform,
   });
 
   return sess?.token;
@@ -43,7 +46,7 @@ const retrieve_setting = async (profile, body) => {
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        "x-api-version": "v2",
+        "x-api-version": "v1",
         "x-platform": `profile.savvyaisolution.com`,
         Authorization: `Bearer ${auth}`,
       },
@@ -93,7 +96,7 @@ const create_profile = async ({ platform, details, type }) => {
   console.log(platform, details, type);
   let setting = await retrieve_setting(platform);
 
-  console.log(setting);
+  console.log(setting, "SETTINGS");
 
   let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
@@ -187,7 +190,7 @@ const create_profile = async ({ platform, details, type }) => {
           variables: {
             profile: { name: profile_details.fullname },
             platform,
-            otp: { code: otp, expiry: otp_conf.length },
+            otp: { code: otp, expiry: otp_conf.expiry },
           },
         },
       },

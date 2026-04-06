@@ -224,9 +224,13 @@ const verify_platform = async (req, res) => {
   delete platform.password;
 
   await (await USERS()).insertOne(platform);
-  await (
-    await PROFILES()
-  ).insertOne({ ...platform, profile: Platform_profile_type_id });
+  let platform_profile = {
+    ...platform,
+    profile: Platform_profile_type_id,
+    platform: platform?._id,
+  };
+  delete platform_profile.uri;
+  await (await PROFILES()).insertOne(platform_profile);
   await (await PASSWORDS()).insertOne({ _id: platform._id, key: pass });
 
   await (
