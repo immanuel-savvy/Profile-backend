@@ -14,6 +14,8 @@ const version_middleware = (app) => {
 
       const router = routers[version];
 
+      if (version === "v1") return router(req, res);
+
       if (!router) {
         return res.status(400).json({
           error: "Invalid API version",

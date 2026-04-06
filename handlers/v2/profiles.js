@@ -33,7 +33,7 @@ const service_auth = async (profile, uri) => {
   return sess?.token;
 };
 
-const retrieve_setting = async (profile) => {
+const retrieve_setting = async (profile, body) => {
   let auth = await service_auth(profile, "settings.savvyaisolution.com");
   if (!auth) return;
 
@@ -47,12 +47,12 @@ const retrieve_setting = async (profile) => {
         "x-platform": `profile.savvyaisolution.com`,
         Authorization: `Bearer ${auth}`,
       },
-      body: JSON.stringify({ profile: profile._id }),
+      body: JSON.stringify(body || {}),
     });
 
     res = await res.json();
 
-    return res;
+    return res?.ok ? res?.data : undefined;
   } catch (err) {
     console.error(err);
   }
@@ -90,12 +90,17 @@ const send_message = async (
 };
 
 const create_profile = async ({ platform, details, type }) => {
+  console.log(platform, details, type);
   let setting = await retrieve_setting(platform);
 
-  let uids = setting?.[type]?.unique_ids || {
+  console.log(setting);
+
+  let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
     query: "and",
   };
+
+  console.log(uids);
 
   if (!uids || !uids.properties?.length) {
     uids = { properties: ["email"], query: "and" };
@@ -160,15 +165,16 @@ const create_profile = async ({ platform, details, type }) => {
 
   const profile_details = result.value || result;
 
-  let verification_setting =
-    setting?.[type]?.verification || setting?.verification;
+  let verification_setting = setting?.verification;
 
   // 🔐 Generate OTP
-  const otp = await generate_otp(profile_details.email, type, {
-    expiry: verification_setting?.expiry || OTP_expiry,
-    length: verification_setting?.length || 6,
-  });
+  let otp_conf = {
+    expiry: verification_setting?.otp?.expiry || OTP_expiry,
+    length: verification_setting?.otp?.length || 6,
+  };
+  const otp = await generate_otp(profile_details.email, type, otp_conf);
 
+  let template = verification_setting?.template || "signup_otp";
   // 📧 Email
   if (uids.properties.includes("email") && details.email) {
     await send_mail(
@@ -176,12 +182,12 @@ const create_profile = async ({ platform, details, type }) => {
         from: { name: platform.name },
         to: details.email,
         content: {
-          template: "signup_otp",
+          template,
           category: "verification",
           variables: {
             profile: { name: profile_details.fullname },
             platform,
-            otp: { code: otp, expiry: OTP_expiry },
+            otp: { code: otp, expiry: otp_conf.length },
           },
         },
       },
@@ -199,7 +205,7 @@ const create_profile = async ({ platform, details, type }) => {
         content: {
           profile: profile_details,
           platform,
-          otp: { code: otp, expiry_time: OTP_expiry },
+          otp: { code: otp, expiry: otp_conf.expiry },
         },
       },
       await get_platform_profile(platform),
@@ -265,7 +271,7 @@ const verify_profile = async (req, res) => {
 
     // ⏳ Expiry
     if (
-      new Date(otpRecord.updatedAt).getTime() + OTP_expiry * 1000 * 60 <
+      new Date(otpRecord.updatedAt).getTime() + otpRecord.expiry * 1000 * 60 <
       Date.now()
     ) {
       return res.json({
@@ -375,7 +381,7 @@ const signin_user = async ({
 }) => {
   let setting = await retrieve_setting(platform);
 
-  let uids = setting?.[body.profile]?.unique_ids || {
+  let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
     query: "and",
   };
@@ -414,21 +420,20 @@ const signin_user = async ({
   }
 
   // 🔐 Check 2FA
-  let profile_setting = await retrieve_setting(user, platform);
+  let profile_setting = await retrieve_setting(user);
 
-  const requires2FA =
-    profile_setting?.two_factor_auth ||
-    setting?.[body.profile]?.two_factor_auth;
+  const requires2FA = profile_setting?.two_factor_auth;
 
-  if (requires2FA) {
+  if (setting?.two_factor_auth?.force_enable || requires2FA?.enabled) {
     const identifiers = [user.email, user.phone].filter(Boolean);
 
-    const otp = await generate_otp(identifiers, body.profile);
+    const otp = await generate_otp(
+      identifiers,
+      body.profile,
+      setting.two_factor_auth.otp,
+    );
 
-    let template =
-      setting?.[body.profile]?.two_factor_auth_template ||
-      setting?.two_factor_auth_template ||
-      "two_factor_auth_otp";
+    let template = setting?.two_factor_auth?.template || "two_factor_auth_otp";
 
     if (user.email) {
       await send_mail(
@@ -443,7 +448,10 @@ const signin_user = async ({
                 ...user,
               },
               platform,
-              otp: { code: otp, expiry_time: OTP_expiry },
+              otp: {
+                code: otp,
+                expiry: setting?.two_factor_auth?.otp?.expiry || OTP_expiry,
+              },
             },
           },
         },
@@ -460,7 +468,10 @@ const signin_user = async ({
           content: {
             profile: user,
             platform,
-            otp: { code: otp, expiry_time: OTP_expiry },
+            otp: {
+              code: otp,
+              expiry_time: setting?.two_factor_auth?.otp?.expiry || OTP_expiry,
+            },
           },
         },
         platform,
@@ -549,7 +560,7 @@ const profile_two_factor_auth = async (req, res) => {
 
     // ⏳ Check expiry
     if (
-      new Date(otp.updatedAt).getTime() + OTP_expiry * 1000 * 60 <
+      new Date(otp.updatedAt).getTime() + otp.expiry * 1000 * 60 <
       Date.now()
     ) {
       return res.json({
@@ -561,7 +572,7 @@ const profile_two_factor_auth = async (req, res) => {
     // 🔑 Rebuild user lookup using uids
     let setting = await retrieve_setting(platform);
 
-    let uids = setting?.[profile]?.unique_ids || {
+    let uids = setting?.identity?.unique_ids || {
       properties: ["email"],
       query: "and",
     };
@@ -620,11 +631,11 @@ const profile_two_factor_auth = async (req, res) => {
 const resend_profile_otp = async (req, res) => {
   try {
     let platform = req.headers.platform;
-    let { email, phone, profile } = req.body;
+    let { email, phone, profile, kind } = req.body;
 
     let setting = await retrieve_setting(platform);
 
-    let uids = setting?.[profile]?.unique_ids || {
+    let uids = setting?.identity?.unique_ids || {
       properties: ["email"],
       query: "and",
     };
@@ -655,49 +666,119 @@ const resend_profile_otp = async (req, res) => {
       });
     }
 
-    // 🔐 Generate OTP
-    const otp = await generate_otp([user.email, user.phone], profile);
+    let conf =
+      setting[
+        kind === "2fa"
+          ? "two_factor_auth"
+          : kind === "psk"
+            ? "forgot_password"
+            : "verification"
+      ] || {};
 
-    let template =
-      setting?.[profile]?.verification_template ||
-      setting?.verification_template ||
-      "signup_otp";
+    if (conf?.mode === "link") {
+      const resetToken = crypto.randomBytes(32).toString("hex");
+      await (
+        await RESET_TOKENS()
+      ).insertOne({
+        _id: crypto.randomUUID(),
+        user: user._id,
+        token: resetToken,
+        expiry: conf.reset.expiry || OTP_expiry,
+        platform: platform._id,
+        profile,
+        created: new Date(),
+      });
 
-    // 📧 Send email
-    if (uids?.properties?.includes("email") && user.email) {
-      await send_mail(
-        {
-          from: { name: platform.name },
-          to: user.email,
-          content: {
-            template,
-            category: "verification",
-            variables: {
-              profile: user,
-              platform,
-              otp: { code: otp, expiry_time: OTP_expiry },
+      let template = conf.template.link;
+
+      // 📧 Send email
+      if (uids?.properties?.includes("email") && user.email) {
+        await send_mail(
+          {
+            from: { name: platform.name },
+            to: user.email,
+            content: {
+              template,
+              category: "verification",
+              variables: {
+                profile: user,
+                platform,
+                reset: {
+                  link: `${conf?.reset?.url}?token=${resetToken}`,
+                  expiry: conf.reset?.expiry || OTP_expiry,
+                },
+              },
             },
           },
-        },
-        await get_platform_profile(platform),
-      );
-    }
+          await get_platform_profile(platform),
+        );
+      }
 
-    // 📱 Send SMS
-    if (uids?.properties?.includes("phone") && user.phone) {
-      await send_message(
-        {
-          phone: user.phone,
-          template,
-          category: "verification",
-          content: {
-            profile: user,
-            platform,
-            otp: { code: otp, expiry_time: OTP_expiry },
+      // 📱 Send SMS
+      if (uids?.properties?.includes("phone") && user.phone) {
+        await send_message(
+          {
+            phone: user.phone,
+            template,
+            category: "verification",
+            content: {
+              profile: user,
+              platform,
+              reset: {
+                link: `${conf?.reset?.url}?token=${resetToken}`,
+                expiry: conf.reset?.expiry || OTP_expiry,
+              },
+            },
           },
-        },
-        await get_platform_profile(platform),
-      );
+          await get_platform_profile(platform),
+        );
+      }
+    } else {
+      let otp;
+
+      otp = await generate_otp([user.email, user.phone], profile, conf.otp);
+
+      let template =
+        (typeof conf.template === "string"
+          ? conf.template
+          : conf.template[conf.mode]) || "signup_otp";
+
+      // 📧 Send email
+      if (uids?.properties?.includes("email") && user.email) {
+        await send_mail(
+          {
+            from: { name: platform.name },
+            to: user.email,
+            content: {
+              template,
+              category: "verification",
+              variables: {
+                profile: user,
+                platform,
+                otp: { code: otp, expiry: conf.otp.expiry },
+              },
+            },
+          },
+          await get_platform_profile(platform),
+        );
+      }
+
+      // 📱 Send SMS
+      if (uids?.properties?.includes("phone") && user.phone) {
+        await send_message(
+          {
+            phone: user.phone,
+            template,
+            category: "verification",
+            content: {
+              profile: user,
+              platform,
+              otp: { code: otp, expiry: conf.otp.expiry },
+            },
+          },
+          await get_platform_profile(platform),
+        );
+      }
     }
 
     return res.json({
@@ -721,7 +802,7 @@ const profile_forgot_password = async (req, res) => {
 
     let setting = await retrieve_setting(platform);
 
-    let uids = setting?.[profile]?.unique_ids || {
+    let uids = setting?.identity?.unique_ids || {
       properties: ["email"],
       query: "and",
     };
@@ -753,10 +834,9 @@ const profile_forgot_password = async (req, res) => {
     }
 
     let settings = await retrieve_setting(platform);
-    let reset_password_setting =
-      settings?.[profile]?.forgot_password || settings?.forgot_password;
+    let reset_password_setting = settings?.forgot_password;
 
-    if (reset_password_setting?.reset_password_url) {
+    if (reset_password_setting?.mode === "link") {
       // 🔐 Generate reset token
       const resetToken = crypto.randomBytes(32).toString("hex");
       await (
@@ -765,14 +845,14 @@ const profile_forgot_password = async (req, res) => {
         _id: crypto.randomUUID(),
         user: user._id,
         token: resetToken,
-        expiry: reset_password_setting.expiry || OTP_expiry,
+        expiry: reset_password_setting.reset?.expiry || OTP_expiry,
         platform: platform._id,
         profile,
         created: new Date(),
       });
 
       let template =
-        reset_password_setting?.reset_link_template || "forgot_password_link";
+        reset_password_setting?.template?.link || "forgot_password_link";
 
       // 📧 Send email
       if (uids?.properties?.includes("email") && user.email) {
@@ -787,8 +867,8 @@ const profile_forgot_password = async (req, res) => {
                 profile: user,
                 platform,
                 reset: {
-                  link: `${reset_password_setting?.reset_password_url}?token=${resetToken}`,
-                  expiry: reset_password_setting?.expiry,
+                  link: `${reset_password_setting?.reset?.url}?token=${resetToken}`,
+                  expiry: reset_password_setting?.reset?.expiry,
                 },
               },
             },
@@ -807,7 +887,10 @@ const profile_forgot_password = async (req, res) => {
             content: {
               profile: user,
               platform,
-              reset_link: `${reset_password_setting?.reset_password_url}?token=${resetToken}`,
+              reset: {
+                link: `${reset_password_setting?.reset?.url}?token=${resetToken}`,
+                expiry: reset_password_setting?.reset?.expiry,
+              },
             },
           },
           await get_platform_profile(platform),
@@ -825,12 +908,12 @@ const profile_forgot_password = async (req, res) => {
     } else {
       // 🔐 Generate OTP
       const otp = await generate_otp([user.email, user.phone], profile, {
-        expiry: reset_password_setting?.expiry || OTP_expiry,
+        expiry: reset_password_setting?.otp?.expiry || OTP_expiry,
+        length: reset_password_setting?.otp?.length,
       });
 
       let template =
-        reset_password_setting?.forgot_password_template ||
-        "forgot_password_otp";
+        reset_password_setting?.template?.otp || "forgot_password_otp";
 
       // 📧 Send email
       if (user.email) {
@@ -844,7 +927,7 @@ const profile_forgot_password = async (req, res) => {
               variables: {
                 profile: user,
                 platform,
-                otp: { code: otp, expiry_time: reset_password_setting?.expiry },
+                otp: { code: otp, expiry: reset_password_setting?.otp?.expiry },
               },
             },
           },
@@ -862,7 +945,7 @@ const profile_forgot_password = async (req, res) => {
             content: {
               profile: user,
               platform,
-              otp: { code: otp, expiry_time: reset_password_setting?.expiry },
+              otp: { code: otp, expiry: reset_password_setting?.otp?.expiry },
             },
           },
           await get_platform_profile(platform),
@@ -889,6 +972,11 @@ const profile_verify_forgot_password = async (req, res) => {
     let platform = req.headers.platform;
     let { email, phone, code, token, profile, new_password } = req.body;
 
+    /**
+     * =========================
+     * TOKEN RESET FLOW
+     * =========================
+     */
     if (token) {
       let rest = await (await RESET_TOKENS()).findOne({ token });
       if (!rest) {
@@ -922,10 +1010,15 @@ const profile_verify_forgot_password = async (req, res) => {
       });
     }
 
+    /**
+     * =========================
+     * OTP FLOW
+     * =========================
+     */
+
     let collection = await OTPS(profile);
     let identifiers = [email, phone].filter(Boolean);
 
-    // 🔎 Find OTP
     let otp = await collection.findOne({
       id: { $in: identifiers },
     });
@@ -944,7 +1037,6 @@ const profile_verify_forgot_password = async (req, res) => {
       });
     }
 
-    // ⏳ Expiry check
     if (
       new Date(otp.updatedAt).getTime() + otp.expiry * 1000 * 60 <
       Date.now()
@@ -955,10 +1047,15 @@ const profile_verify_forgot_password = async (req, res) => {
       });
     }
 
-    // 🔑 Rebuild user lookup
+    /**
+     * =========================
+     * USER LOOKUP
+     * =========================
+     */
+
     let setting = await retrieve_setting(platform);
 
-    let uids = setting?.[profile]?.unique_ids || {
+    let uids = setting?.identity?.unique_ids || {
       properties: ["email"],
       query: "and",
     };
@@ -982,7 +1079,12 @@ const profile_verify_forgot_password = async (req, res) => {
       });
     }
 
-    // 🔐 Hash new password
+    /**
+     * =========================
+     * PASSWORD UPDATE
+     * =========================
+     */
+
     const newHash = hash(new_password);
 
     await (
@@ -998,8 +1100,38 @@ const profile_verify_forgot_password = async (req, res) => {
       { upsert: true },
     );
 
-    // 🧹 Cleanup OTP
+    /**
+     * =========================
+     * CLEANUP OTP
+     * =========================
+     */
+
     await collection.deleteOne({ _id: otp._id });
+
+    /**
+     * =========================
+     * EMAIL NOTIFICATION (NEW)
+     * =========================
+     */
+
+    if (user.email) {
+      await send_mail(
+        {
+          from: { name: platform.name },
+          to: user.email,
+          content: {
+            template: "password_updated",
+            category: "security",
+            variables: {
+              profile: user,
+              platform,
+              time: new Date().toISOString(),
+            },
+          },
+        },
+        await get_platform_profile(platform),
+      );
+    }
 
     return res.json({
       ok: true,

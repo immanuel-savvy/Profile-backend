@@ -4,7 +4,7 @@ import { PROFILE_TYPES, USERS } from "../../ds/folders.js";
 // ➕ Create
 const create_profile_type = async (req, res) => {
   try {
-    let platform = req.headers.platform;
+    let platform = req.headers.profile;
     let { name, description, ...rest } = req.body;
 
     if (!name || !description) {
@@ -57,7 +57,7 @@ const create_profile_type = async (req, res) => {
 // 📄 List all
 const get_profile_types = async (req, res) => {
   try {
-    let platform = req.headers.platform;
+    let platform = req.headers.profile;
 
     const Types = await PROFILE_TYPES();
 
@@ -78,7 +78,7 @@ const get_profile_types = async (req, res) => {
 // 🔍 Get single
 const get_profile_type = async (req, res) => {
   try {
-    let platform = req.headers.platform;
+    let platform = req.headers.profile;
     let { name, _id } = req.body;
 
     const Types = await PROFILE_TYPES();
@@ -119,7 +119,7 @@ const get_profile_type = async (req, res) => {
 // ✏️ Update
 const update_profile_type = async (req, res) => {
   try {
-    let platform = req.headers.platform;
+    let platform = req.headers.profile;
     let { name, _id, description, ...rest } = req.body;
 
     const Types = await PROFILE_TYPES();
