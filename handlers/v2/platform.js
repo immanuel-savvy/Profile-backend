@@ -431,23 +431,29 @@ const login_platform = async (req, res) => {
   }
 
   let setting = await retrieve_setting(user);
-  if (setting?.two_factor_auth) {
+  console.log(setting, "SETTING");
+  let two_fa_setting = setting?.two_factor_auth;
+  if (two_fa_setting?.enabled) {
     // Generate OTP
-    const otp = await generate_otp(email, "two_factor_auth");
+    const otp = await generate_otp(
+      email,
+      "two_factor_auth",
+      two_fa_setting?.otp,
+    );
 
     // Send mail
-    await send_mail(
+    let response = await send_mail(
       {
         from: { name: "Profile" },
         to: email,
         content: {
-          template: "two_factor_auth_otp",
+          template: two_fa_setting?.template || "two_factor_auth_otp",
           category: "verification",
           variables: {
             profile: { name: user.name },
             otp: {
               code: otp,
-              expiry: OTP_expiry,
+              expiry: two_fa_setting.otp?.expiry || OTP_expiry,
             },
           },
         },
@@ -456,8 +462,10 @@ const login_platform = async (req, res) => {
     );
 
     return res.json({
-      ok: true,
-      message: "OTP sent to your email. Verify to continue.",
+      ok: !!response?.ok,
+      message: !!response?.ok
+        ? "OTP sent to your email. Verify to continue."
+        : response?.message,
       data: { two_factor_auth: true, email },
     });
   }

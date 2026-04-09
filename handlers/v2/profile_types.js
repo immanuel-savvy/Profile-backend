@@ -1,10 +1,10 @@
 import crypto from "crypto";
-import { PROFILE_TYPES, USERS } from "../../ds/folders.js";
+import { PROFILE_TYPES, PROFILES, USERS } from "../../ds/folders.js";
 
 // ➕ Create
 const create_profile_type = async (req, res) => {
   try {
-    let platform = req.headers.profile;
+    let platform = req.headers.platform;
     let { name, description, ...rest } = req.body;
 
     if (!name || !description) {
@@ -57,7 +57,7 @@ const create_profile_type = async (req, res) => {
 // 📄 List all
 const get_profile_types = async (req, res) => {
   try {
-    let platform = req.headers.profile;
+    let platform = req.headers.platform;
 
     const Types = await PROFILE_TYPES();
 
@@ -78,7 +78,7 @@ const get_profile_types = async (req, res) => {
 // 🔍 Get single
 const get_profile_type = async (req, res) => {
   try {
-    let platform = req.headers.profile;
+    let platform = req.headers.platform;
     let { name, _id } = req.body;
 
     const Types = await PROFILE_TYPES();
@@ -119,7 +119,7 @@ const get_profile_type = async (req, res) => {
 // ✏️ Update
 const update_profile_type = async (req, res) => {
   try {
-    let platform = req.headers.profile;
+    let platform = req.headers.platform;
     let { name, _id, description, ...rest } = req.body;
 
     const Types = await PROFILE_TYPES();
@@ -173,9 +173,58 @@ const update_profile_type = async (req, res) => {
   }
 };
 
+const get_profiles = async (req, res) => {
+  try {
+    let { page = 1, limit = 20, profile, search } = req.body;
+    page = parseInt(page) || 1;
+    limit = parseInt(limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const Profiles = await PROFILES();
+
+    const query = {};
+    if (profile) query.profile = profile;
+
+    if (search && typeof search === "string" && search.trim()) {
+      const s = search.trim();
+      // escape user input for regex
+      const esc = s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const re = new RegExp(esc, "i");
+      query.$or = [
+        { fullname: re },
+        { name: re },
+        { firstname: re },
+        { lastname: re },
+      ];
+    }
+
+    const total = await Profiles.countDocuments(query);
+    const data = await Profiles.find(query)
+      .sort({ created: -1 })
+      .skip(skip)
+      .limit(limit)
+      .toArray();
+
+    return res.json({
+      ok: true,
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false });
+  }
+};
+
 export {
   create_profile_type,
   get_profile_types,
   get_profile_type,
   update_profile_type,
+  get_profiles,
 };
