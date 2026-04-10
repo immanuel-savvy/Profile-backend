@@ -1008,6 +1008,26 @@ const profile_verify_forgot_password = async (req, res) => {
         { upsert: true },
       );
 
+      let prof = await (await PROFILES()).findOne({ _id: rest.user });
+
+      if (prof?.email)
+        await send_mail(
+          {
+            from: { name: platform.name },
+            to: prof.email,
+            content: {
+              template: "password_updated",
+              category: "security",
+              variables: {
+                profile: prof,
+                platform,
+                time: new Date().toISOString(),
+              },
+            },
+          },
+          await get_platform_profile(platform),
+        );
+
       return res.json({
         ok: true,
         message: "Password reset successful",
