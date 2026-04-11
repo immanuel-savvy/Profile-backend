@@ -1,17 +1,4 @@
-import {
-  addjustment,
-  boots,
-  create_profiles,
-  email_setting_adjustment,
-} from "./boots.js";
-import {
-  PROFILE_TYPES,
-  PROFILES,
-  SESSIONS,
-  TOKENS,
-  USERS,
-} from "./ds/folders.js";
-import { Platform_profile_type_id } from "./handlers/v2/platform.js";
+import { PROFILES, USERS } from "./ds/folders.js";
 import handler from "./Profile.js";
 import http from "http";
 

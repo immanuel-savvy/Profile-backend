@@ -24,7 +24,7 @@ const service_auth = async (profile, uri) => {
   if (!profile?.platform) profile = await get_platform_profile(profile);
 
   let platform = await (await USERS()).findOne({ uri });
-  console.log(platform, "HEY?", profile);
+
   let sess = await (
     await SESSIONS()
   ).findOne({
@@ -94,7 +94,6 @@ const send_message = async (
 };
 
 const create_profile = async ({ platform, details, type }) => {
-  console.log(platform, details, type);
   let setting = await retrieve_setting(platform);
 
   console.log(setting, "SETTINGS");
@@ -207,7 +206,7 @@ const create_profile = async ({ platform, details, type }) => {
         template,
         category: "verification",
         content: {
-          profile: profile_details,
+          profile: { name: profile_details.fullname },
           platform,
           otp: { code: otp, expiry: otp_conf.expiry },
         },
@@ -228,6 +227,12 @@ const add_profile = async (req, res) => {
     const platform = req.headers.platform;
     const { details, profile: type } = req.body;
 
+    if (!details || !type) {
+      return res.json({
+        ok: false,
+        message: "Malformed body",
+      });
+    }
     const response = await create_profile({
       platform,
       details,
