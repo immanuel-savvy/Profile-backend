@@ -51,15 +51,26 @@ server.listen(port, async () => {
   //       "updated": "2026-04-05T11:13:58.164Z",
   //       "uri": "trimergeiq.trimergecpa.com"
   //   }
-  console.log(
-    await (
-      await SESSIONS()
-    ).findOne({
-      platform: "usr_settings_001",
-      platform_profile: "731c32b9-5a89-449e-bc90-7b4fb740c618",
-      third_party_platform: "usr_profile_001",
-    }),
-  );
+  // console.log(
+  //   await (
+  //     await SESSIONS()
+  //   ).findOne({
+  //     platform: "usr_email_001",
+  //     platform_profile: "49b73c22-1e17-44d8-9d4b-40d08be21c2a",
+  //     third_party_platform: "usr_profile_001",
+  //   }),
+  // );
+
+  // console.log(
+  //   await (
+  //     await SESSIONS()
+  //   ).findOne({
+  //     platform: "usr_settings_001",
+  //     platform_profile: "49b73c22-1e17-44d8-9d4b-40d08be21c2a",
+  //     third_party_platform: "usr_profile_001",
+  //   }),
+  // );
+
   // console.log(
   //   await (await TOKENS()).findOne({ token: "token_value_email_001" }),
   // );

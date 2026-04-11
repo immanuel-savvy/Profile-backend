@@ -91,6 +91,19 @@ const add_platform = async (req, res) => {
   try {
     let { email, name, password } = req.body;
 
+    if (!email) {
+      return res.json({ ok: false, message: "Email is required" });
+    }
+
+    // normalize and lowercase
+    email = String(email).trim().toLowerCase();
+
+    // basic email regex validation
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(email)) {
+      return res.json({ ok: false, message: "Invalid email address" });
+    }
+
     const Users = await USERS();
     const Pending = await PENDING_USERS();
 
@@ -227,7 +240,7 @@ const verify_platform = async (req, res) => {
   let platform_profile = {
     ...platform,
     profile: Platform_profile_type_id,
-    platform: platform?._id,
+    platform: "usr_profile_001",
   };
   delete platform_profile.uri;
   await (await PROFILES()).insertOne(platform_profile);
@@ -431,7 +444,7 @@ const login_platform = async (req, res) => {
   }
 
   let setting = await retrieve_setting(user);
-  console.log(setting, "SETTING");
+
   let two_fa_setting = setting?.two_factor_auth;
   if (two_fa_setting?.enabled) {
     // Generate OTP

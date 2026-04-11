@@ -63,6 +63,7 @@ const third_party_signin = async (req, res) => {
 
   let { details: body, platform_profile } = req.body;
 
+  console.log(platform, profile, platform_profile);
   let result = await signin_user({
     platform: await (await USERS()).findOne({ _id: profile.platform }),
     body: { ...body, profile: profile.profile },
