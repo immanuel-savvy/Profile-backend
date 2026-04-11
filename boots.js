@@ -19,6 +19,8 @@ const ID_USER_EMAIL = "usr_email_001";
 const ID_USER_PROFILE = "usr_profile_001";
 const ID_USER_SETTINGS = "usr_settings_001";
 
+export { ID_USER_EMAIL, ID_USER_PROFILE, ID_USER_SETTINGS };
+
 // PROFILE TYPES
 const ID_PROFILE_TYPE_PLATFORM = Platform_profile_type_id;
 const ID_PROFILE_TYPE_SETTINGS = "ptype_settings_001";

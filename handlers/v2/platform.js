@@ -11,6 +11,7 @@ import crypto from "crypto";
 import { hash } from "../../utils/hash.js";
 import { retrieve_setting, service_auth } from "./profiles.js";
 import { email_service } from "../../services/email.js";
+import { ID_USER_EMAIL } from "../../boots.js";
 
 let Platform_profile_type_id = "platform_profile_type_id"; // profile type id for platforms
 
@@ -240,7 +241,7 @@ const verify_platform = async (req, res) => {
   let platform_profile = {
     ...platform,
     profile: Platform_profile_type_id,
-    platform: "usr_profile_001",
+    platform: ID_USER_EMAIL,
   };
   delete platform_profile.uri;
   await (await PROFILES()).insertOne(platform_profile);
