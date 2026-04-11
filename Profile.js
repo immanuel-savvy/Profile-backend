@@ -13,7 +13,6 @@ const __dirname = path.dirname(__filename);
 import version_middleware from "./version_control.js";
 
 const app = express();
-
 app.use(cors());
 app.use(express.static(`${__dirname}/assets`));
 app.use(bodyParser.urlencoded({ extended: true, limit: "100mb" }));
