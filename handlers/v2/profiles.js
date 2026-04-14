@@ -175,7 +175,7 @@ const create_profile = async ({ platform, details, type }) => {
     expiry: verification_setting?.otp?.expiry || OTP_expiry,
     length: verification_setting?.otp?.length || 6,
   };
-  const otp = await generate_otp(profile_details.email, type, otp_conf);
+  const otp = await generate_otp([profile_details.email], type, otp_conf);
 
   let template = verification_setting?.template || "signup_otp";
   // 📧 Email
@@ -271,12 +271,19 @@ const verify_profile = async (req, res) => {
       });
     }
 
+    console.log(otpRecord, code, "UHH");
     if (otpRecord.code !== code) {
       return res.json({
         ok: false,
         message: "OTP does not match",
       });
     }
+
+    console.log(
+      new Date(otpRecord.updatedAt).getTime() + otpRecord.expiry * 1000 * 60,
+      "expiry time",
+      otpRecord,
+    );
 
     // ⏳ Expiry
     if (
@@ -641,6 +648,7 @@ const resend_profile_otp = async (req, res) => {
   try {
     let platform = req.headers.platform;
     let { email, phone, profile, kind } = req.body;
+    kind = kind || "verification";
 
     let setting = await retrieve_setting(platform);
 
@@ -667,6 +675,9 @@ const resend_profile_otp = async (req, res) => {
     query.profile = profile;
 
     let user = await (await PROFILES()).findOne(query);
+    if (!user && kind === "verification") {
+      user = await (await PENDING_PROFILES()).findOne({ email, profile });
+    }
 
     if (!user) {
       return res.json({
@@ -676,7 +687,7 @@ const resend_profile_otp = async (req, res) => {
     }
 
     let conf =
-      setting[
+      setting?.[
         kind === "2fa"
           ? "two_factor_auth"
           : kind === "psk"
@@ -745,12 +756,20 @@ const resend_profile_otp = async (req, res) => {
     } else {
       let otp;
 
-      otp = await generate_otp([user.email, user.phone], profile, conf.otp);
+      console.log(user);
+      otp = await generate_otp(
+        [user.email, user.phone],
+        profile,
+        conf.otp || {
+          expiry: OTP_expiry,
+          length: 6,
+        },
+      );
 
       let template =
         (typeof conf.template === "string"
           ? conf.template
-          : conf.template[conf.mode]) || "signup_otp";
+          : conf.template?.[conf.mode]) || "signup_otp";
 
       // 📧 Send email
       if (uids?.properties?.includes("email") && user.email) {
@@ -764,7 +783,7 @@ const resend_profile_otp = async (req, res) => {
               variables: {
                 profile: user,
                 platform,
-                otp: { code: otp, expiry: conf.otp.expiry },
+                otp: { code: otp, expiry: conf?.otp?.expiry || OTP_expiry },
               },
             },
           },
@@ -782,7 +801,7 @@ const resend_profile_otp = async (req, res) => {
             content: {
               profile: user,
               platform,
-              otp: { code: otp, expiry: conf.otp.expiry },
+              otp: { code: otp, expiry: conf?.otp?.expiry || OTP_expiry },
             },
           },
           await get_platform_profile(platform),
@@ -936,7 +955,10 @@ const profile_forgot_password = async (req, res) => {
               variables: {
                 profile: user,
                 platform,
-                otp: { code: otp, expiry: reset_password_setting?.otp?.expiry },
+                otp: {
+                  code: otp,
+                  expiry: reset_password_setting?.otp?.expiry || OTP_expiry,
+                },
               },
             },
           },
@@ -954,7 +976,10 @@ const profile_forgot_password = async (req, res) => {
             content: {
               profile: user,
               platform,
-              otp: { code: otp, expiry: reset_password_setting?.otp?.expiry },
+              otp: {
+                code: otp,
+                expiry: reset_password_setting?.otp?.expiry || OTP_expiry,
+              },
             },
           },
           await get_platform_profile(platform),

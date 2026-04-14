@@ -1,4 +1,4 @@
-import { PROFILES, USERS } from "./ds/folders.js";
+import { OTPS, PROFILES, USERS } from "./ds/folders.js";
 import handler from "./Profile.js";
 import http from "http";
 
@@ -62,6 +62,10 @@ server.listen(port, async () => {
   //   await (await TOKENS()).findOne({ token: "token_value_email_001" }),
   // );
   // let Profiles = await PROFILES();
+
+  // let otp = await OTPS("c59f98aa-0402-4bd4-ad9f-ab7e95180f14");
+
+  // console.log(await otp.deleteMany());
 
   console.log(`Profile API is listening on http://localhost:${port}`);
 });

@@ -12,6 +12,7 @@ import {
   get_profile_type,
   get_profile_types,
   get_profiles,
+  get_profiles_by_id,
   update_profile_type,
 } from "../handlers/v2/profile_types.js";
 import {
@@ -49,6 +50,7 @@ const routes = {
   "/get_profile_type": get_profile_type,
   "/get_profile_types": get_profile_types,
   "/get_profiles": get_profiles,
+  "/get_profiles_by_id": get_profiles_by_id,
 
   // Profile
   "/signin": signin,

@@ -221,10 +221,26 @@ const get_profiles = async (req, res) => {
   }
 };
 
+const get_profiles_by_id = async (req, res) => {
+  let { _ids } = req.body;
+
+  const Profiles = await PROFILES();
+
+  let data = await Profiles.find({
+    _id: { $in: _ids },
+  }).toArray();
+
+  return res.json({
+    ok: true,
+    data,
+  });
+};
+
 export {
   create_profile_type,
   get_profile_types,
   get_profile_type,
   update_profile_type,
   get_profiles,
+  get_profiles_by_id,
 };
