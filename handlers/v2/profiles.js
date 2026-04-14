@@ -688,11 +688,13 @@ const resend_profile_otp = async (req, res) => {
 
     let conf =
       setting?.[
-        kind === "2fa"
-          ? "two_factor_auth"
-          : kind === "psk"
-            ? "forgot_password"
-            : "verification"
+        kind === "upd"
+          ? "update_verification"
+          : kind === "2fa"
+            ? "two_factor_auth"
+            : kind === "psk"
+              ? "forgot_password"
+              : "verification"
       ] || {};
 
     if (conf?.mode === "link") {
@@ -756,7 +758,6 @@ const resend_profile_otp = async (req, res) => {
     } else {
       let otp;
 
-      console.log(user);
       otp = await generate_otp(
         [user.email, user.phone],
         profile,
@@ -1200,11 +1201,225 @@ const profile_verify_forgot_password = async (req, res) => {
   }
 };
 
+const update_profile = async (req, res) => {
+  try {
+    let platform = req.headers.platform;
+    let { profile, updates } = req.body;
+
+    if (!profile || !updates || typeof updates !== "object") {
+      return res.json({
+        ok: false,
+        message: "Malformed body",
+      });
+    }
+
+    let Profiles = await PROFILES();
+    let profile_data = await Profiles.findOne({ _id: profile });
+
+    if (!profile_data) {
+      return res.json({
+        ok: false,
+        message: "Profile is not found.",
+      });
+    }
+
+    let settings = await retrieve_setting(platform, {
+      category: "identity",
+      value: "unique_ids",
+    });
+
+    let uids = settings?.identity?.unique_ids || {
+      properties: ["email"],
+      query: "and",
+    };
+
+    const attempting = uids.properties.filter((p) =>
+      Object.prototype.hasOwnProperty.call(updates, p),
+    );
+
+    if (attempting.length) {
+      return res.status(403).json({
+        ok: false,
+        message:
+          "Unique identity fields cannot be updated via this endpoint; please use the update profile unique endpoint instead.",
+        data: { fields: attempting },
+      });
+    }
+
+    const result = await Profiles.findOneAndUpdate(
+      { _id: profile },
+      { $set: updates, $currentDate: { updated: true } },
+      { returnDocument: "after" },
+    );
+
+    const updatedProfile =
+      result?.value || (await Profiles.findOne({ _id: profile }));
+
+    res.json({
+      ok: true,
+      message: "Profile updated successfully.",
+      data: updatedProfile,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({
+      ok: false,
+      message: "Internal server error",
+    });
+  }
+};
+
+const update_profile_unique = async (req, res) => {
+  let { platform } = req.headers;
+  let { unique, value, profile } = req.body;
+
+  let Profiles = await PROFILES();
+  let profile_data = await Profiles.findOne({ _id: profile });
+
+  if (!profile_data) {
+    return res.json({
+      ok: false,
+      message: "Profile is not found.",
+    });
+  }
+
+  let settings = await retrieve_setting(platform, {
+    category: "update_verification",
+  });
+
+  let otp = await generate_otp(
+    [profile_data._id],
+    profile_data.profile,
+    settings?.update_verification?.otp || {
+      expiry: OTP_expiry,
+      length: 6,
+      meta: { type: "update_unique", field: unique, value },
+    },
+  );
+
+  if (unique === "email") {
+    await send_mail(
+      {
+        from: { name: platform.name },
+        to: value,
+        content: {
+          template: "update_email",
+          category: "verification",
+          variables: {
+            profile: profile_data,
+            platform,
+            otp: {
+              code: otp,
+              expiry: settings?.update_verification?.otp?.expiry || OTP_expiry,
+            },
+          },
+        },
+      },
+      await get_platform_profile(platform),
+    );
+
+    res.json({
+      ok: true,
+      message: "Email updated successfully.",
+    });
+  } else if (unique === "phone") {
+    await send_message(
+      {
+        phone: value,
+        template: "update_phone",
+        category: "verification",
+        content: {
+          profile: profile_data,
+          platform,
+          otp: {
+            code: otp,
+            expiry: settings?.update_verification?.otp?.expiry || OTP_expiry,
+          },
+        },
+      },
+      await get_platform_profile(platform),
+    );
+
+    res.json({
+      ok: true,
+      message: "Phone updated successfully.",
+    });
+  } else {
+    res.json({
+      ok: false,
+      message: "Unsupported unique field.",
+    });
+  }
+};
+
+const validate_update_profile_unique = async (req, res) => {
+  let { platform } = req.headers;
+  let { profile, code } = req.body;
+
+  let Profiles = await PROFILES();
+  let profile_data = await Profiles.findOne({ _id: profile });
+
+  if (!profile_data) {
+    return res.json({
+      ok: false,
+      message: "Profile is not found.",
+    });
+  }
+
+  let collection = await OTPS(profile_data.profile);
+  let otp = await collection.findOne({
+    id: { $in: [profile_data._id] },
+  });
+  if (!otp) {
+    return res.json({
+      ok: false,
+      message: "OTP not found",
+    });
+  }
+
+  if (otp.code !== code) {
+    return res.json({
+      ok: false,
+      message: "OTP does not match",
+    });
+  }
+
+  if (new Date(otp.updatedAt).getTime() + otp.expiry * 1000 * 60 < Date.now()) {
+    return res.json({
+      ok: false,
+      message: "OTP has expired",
+    });
+  }
+
+  let updates = {};
+  updates[otp.meta.field] = otp.meta.value;
+
+  const result = await Profiles.findOneAndUpdate(
+    { _id: profile },
+    { $set: updates, $currentDate: { updated: true } },
+    { returnDocument: "after" },
+  );
+
+  const updatedProfile =
+    result?.value || (await Profiles.findOne({ _id: profile }));
+
+  await collection.deleteOne({ _id: otp._id });
+
+  res.json({
+    ok: true,
+    message: "Profile updated successfully.",
+    data: updatedProfile,
+  });
+};
+
 export {
   add_profile,
   retrieve_setting,
+  update_profile,
+  update_profile_unique,
   signin,
   verify_profile,
+  validate_update_profile_unique,
   profile_two_factor_auth,
   profile_forgot_password,
   profile_verify_forgot_password,

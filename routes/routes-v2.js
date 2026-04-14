@@ -22,6 +22,9 @@ import {
   profile_verify_forgot_password,
   resend_profile_otp,
   signin,
+  update_profile,
+  update_profile_unique,
+  validate_update_profile_unique,
   verify_profile,
 } from "../handlers/v2/profiles.js";
 import {
@@ -60,6 +63,9 @@ const routes = {
   "/profile_forgot_password": profile_forgot_password,
   "/profile_verify_forgot_password": profile_verify_forgot_password,
   "/resend_profile_otp": resend_profile_otp,
+  "/resend_profile_otp": update_profile,
+  "/update_profile_unique": update_profile_unique,
+  "/validate_update_profile_unique": validate_update_profile_unique,
 
   // Third party
   "/third_party_signin": third_party_signin,

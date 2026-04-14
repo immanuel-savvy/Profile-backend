@@ -54,7 +54,7 @@ const send_mail = async ({ from, to, content }, platform) => {
 };
 
 const generate_otp = async (id, sub, opts = {}) => {
-  let { expiry = 5, length = 6 } = opts || {};
+  let { expiry = 5, length = 6, meta } = opts || {};
 
   const collection = await OTPS(sub);
 
@@ -73,6 +73,7 @@ const generate_otp = async (id, sub, opts = {}) => {
       $set: {
         code,
         expiry,
+        meta,
         updatedAt: new Date(),
       },
       $setOnInsert: {
