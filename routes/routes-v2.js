@@ -63,7 +63,7 @@ const routes = {
   "/profile_forgot_password": profile_forgot_password,
   "/profile_verify_forgot_password": profile_verify_forgot_password,
   "/resend_profile_otp": resend_profile_otp,
-  "/resend_profile_otp": update_profile,
+  "/update_profile": update_profile,
   "/update_profile_unique": update_profile_unique,
   "/validate_update_profile_unique": validate_update_profile_unique,
 
