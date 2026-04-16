@@ -93,13 +93,23 @@ const get_profile_type = async (req, res) => {
 };
 
 const get_profiles = async (req, res) => {
-  let { profile, skip } = req.body,
+  let { profile, skip, ids } = req.body,
     limit = 20;
   skip = skip || 0;
 
   let Profiles = await PROFILES();
 
-  let data = await Profiles.find({ profile })
+  let query = {};
+
+  if (profile) {
+    query.profile = profile;
+  }
+
+  if (ids && Array.isArray(ids)) {
+    query._id = { $in: ids };
+  }
+
+  let data = await Profiles.find(query)
     .sort({ _id: -1 })
     .skip(skip)
     .limit(limit)

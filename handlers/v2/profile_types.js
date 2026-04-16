@@ -175,7 +175,7 @@ const update_profile_type = async (req, res) => {
 
 const get_profiles = async (req, res) => {
   try {
-    let { page = 1, limit = 20, profile, search } = req.body;
+    let { page = 1, limit = 20, profile, ids, search } = req.body;
     page = parseInt(page) || 1;
     limit = parseInt(limit) || 20;
     const skip = (page - 1) * limit;
@@ -184,6 +184,7 @@ const get_profiles = async (req, res) => {
 
     const query = {};
     if (profile) query.profile = profile;
+    if (ids && Array.isArray(ids)) query._id = { $in: ids };
 
     if (search && typeof search === "string" && search.trim()) {
       const s = search.trim();
