@@ -1,15 +1,15 @@
-const validate = async (req, res) => {
+const validate = async (req) => {
   let platform = req.headers["platform"];
   let profile = req.headers["profile"];
 
-  return res.json({
+  return {
     ok: true,
     message: "Validation successful",
     data: {
       profile,
       platform,
     },
-  });
+  };
 
   // let authorisation = req.headers["authorization"];
   // authorisation = authorisation ? authorisation.replace("Bearer ", "") : null;

@@ -32,7 +32,7 @@ const send_mail = async ({ from, to, content }, platform) => {
     };
   }
 
-  let res = await fetch(`${email_service}/send_mail`, {
+  let response = await fetch(`${email_service}/send_mail`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -48,9 +48,9 @@ const send_mail = async ({ from, to, content }, platform) => {
     }),
   });
 
-  res = res.json();
+  response = response.json();
 
-  return res;
+  return response;
 };
 
 const generate_otp = async (id, sub, opts = {}) => {
@@ -88,147 +88,125 @@ const generate_otp = async (id, sub, opts = {}) => {
 
 const OTP_expiry = 5;
 
-const add_platform = async (req, res) => {
-  try {
-    let { email, name, password } = req.body;
+const add_platform = async (req) => {
+  let { email, name, password } = req.body;
 
-    if (!email) {
-      return res.json({ ok: false, message: "Email is required" });
+  const Users = await USERS();
+  const Pending = await PENDING_USERS();
+
+  // Normalize inputs
+  const cleanName = name.replace(/\s+/g, "").toLowerCase();
+  const emailDomain = email.split("@")[1].toLowerCase();
+
+  // Create URI
+  const uri = `${cleanName}.${emailDomain}`;
+
+  // Check existing
+  let exist = await Users.findOne({
+    $or: [{ email }, { name }],
+  });
+
+  if (exist) {
+    let msg;
+
+    if (email === exist.email && name === exist.name) {
+      msg = "Email and Name have already been used";
+    } else if (email === exist.email) {
+      msg = "Email has already been used";
+    } else if (name === exist.name) {
+      msg = "Name has already been used";
     }
 
-    // normalize and lowercase
-    email = String(email).trim().toLowerCase();
+    return {
+      ok: false,
+      message: msg,
+    };
+  }
 
-    // basic email regex validation
-    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    if (!emailRegex.test(email)) {
-      return res.json({ ok: false, message: "Invalid email address" });
-    }
+  // Hash password
+  const hashedPassword = hash(password);
 
-    const Users = await USERS();
-    const Pending = await PENDING_USERS();
-
-    // Normalize inputs
-    const cleanName = name.replace(/\s+/g, "").toLowerCase();
-    const emailDomain = email.split("@")[1].toLowerCase();
-
-    // Create URI
-    const uri = `${cleanName}.${emailDomain}`;
-
-    // Check existing
-    let exist = await Users.findOne({
-      $or: [{ email }, { name }],
-    });
-
-    if (exist) {
-      let msg;
-
-      if (email === exist.email && name === exist.name) {
-        msg = "Email and Name have already been used";
-      } else if (email === exist.email) {
-        msg = "Email has already been used";
-      } else if (name === exist.name) {
-        msg = "Name has already been used";
-      }
-
-      return res.json({
-        ok: false,
-        message: msg,
-      });
-    }
-
-    // Hash password
-    const hashedPassword = hash(password);
-
-    // Upsert pending user
-    await Pending.updateOne(
-      { email, name },
-      {
-        $set: {
-          name,
-          email,
-          uri, // ✅ added here
-          password: hashedPassword,
-          updated: new Date(),
-        },
-        $setOnInsert: {
-          _id: crypto.randomUUID(),
-          created: new Date(),
-        },
+  // Upsert pending user
+  await Pending.updateOne(
+    { email, name },
+    {
+      $set: {
+        name,
+        email,
+        uri, // ✅ added here
+        password: hashedPassword,
+        updated: new Date(),
       },
-      { upsert: true },
-    );
+      $setOnInsert: {
+        _id: crypto.randomUUID(),
+        created: new Date(),
+      },
+    },
+    { upsert: true },
+  );
 
-    // Generate OTP
+  // Generate OTP
 
-    const otp = await generate_otp(email);
+  const otp = await generate_otp(email);
 
-    // Send mail
-    const mail_res = await send_mail(
-      {
-        from: { name: "Profile" },
-        to: email,
-        content: {
-          template: "signup_otp",
-          category: "verification",
-          variables: {
-            profile: { name },
-            otp: {
-              code: otp,
-              expiry: OTP_expiry,
-            },
+  // Send mail
+  const mail_res = await send_mail(
+    {
+      from: { name: "Profile" },
+      to: email,
+      content: {
+        template: "signup_otp",
+        category: "verification",
+        variables: {
+          profile: { name },
+          otp: {
+            code: otp,
+            expiry: OTP_expiry,
           },
         },
       },
-      await (
-        await PROFILES()
-      ).findOne({
-        _id: process.env.PROFILE_ID,
-      }),
-    );
+    },
+    await (
+      await PROFILES()
+    ).findOne({
+      _id: process.env.PROFILE_ID,
+    }),
+  );
 
-    return res.json({
-      ok: mail_res.ok || false,
-      message: mail_res.ok
-        ? "OTP sent to your email. Verify to continue."
-        : mail_res.message || "Failed to send OTP email",
-      data: { email, name, uri }, // ✅ return it too
-    });
-  } catch (err) {
-    console.error(err);
-
-    return res.status(500).json({
-      ok: false,
-      message: "Internal server error",
-    });
-  }
+  return {
+    ok: mail_res.ok || false,
+    message: mail_res.ok
+      ? "OTP sent to your email. Verify to continue."
+      : mail_res.message || "Failed to send OTP email",
+    data: { email, name, uri }, // ✅ return it too
+  };
 };
 
-const verify_platform = async (req, res) => {
+const verify_platform = async (req) => {
   let { email, code } = req.body;
 
   let collection = await OTPS();
   let otp = await collection.findOne({ id: email });
 
   if (!otp) {
-    return res.json({
+    return {
       ok: false,
       message: "OTP not found",
-    });
+    };
   }
 
   if (otp.code !== code) {
-    return res.json({
+    return {
       ok: false,
       message: "OTP does not match",
-    });
+    };
   }
 
   if (new Date(otp.updatedAt).getTime() + OTP_expiry * 1000 * 60 < Date.now()) {
-    return res.json({
+    return {
       ok: false,
       message: "OTP have expired",
-    });
+    };
   }
 
   let Pending = await PENDING_USERS();
@@ -270,24 +248,24 @@ const verify_platform = async (req, res) => {
     await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
   );
 
-  res.json({
+  return {
     ok: true,
     message: "Platform verified",
     data: platform,
-  });
+  };
 };
 
-const resend_verification_otp = async (req, res) => {
+const resend_verification_otp = async (req) => {
   let { email } = req.body;
 
   let Pending = await PENDING_USERS();
   let platform = await Pending.findOne({ email });
 
   if (!platform) {
-    return res.json({
+    return {
       ok: false,
       message: "Platform not found",
-    });
+    };
   }
 
   const otp = await generate_otp(email);
@@ -311,24 +289,24 @@ const resend_verification_otp = async (req, res) => {
     await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
   );
 
-  return res.json({
+  return {
     ok: mail_res.ok || false,
     message: mail_res.ok
       ? "OTP resent to your email. Verify to continue."
       : mail_res.message || "Failed to resend OTP email",
-  });
+  };
 };
 
-const forgot_password = async (req, res) => {
+const forgot_password = async (req) => {
   let { email } = req.body;
 
   let user = await (await USERS()).findOne({ email });
 
   if (!user) {
-    return res.json({
+    return {
       ok: false,
       message: "Platform not found",
-    });
+    };
   }
 
   const otp = await generate_otp(email);
@@ -352,48 +330,48 @@ const forgot_password = async (req, res) => {
     await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
   );
 
-  return res.json({
+  return {
     ok: mail_res.ok || false,
     message: mail_res.ok
       ? "OTP sent to your email. Verify to continue."
       : mail_res.message || "Failed to send OTP email",
-  });
+  };
 };
 
-const verify_forgot_password_otp = async (req, res) => {
+const verify_forgot_password_otp = async (req) => {
   let { email, code, new_password } = req.body;
 
   let collection = await OTPS();
   let otp = await collection.findOne({ id: email });
 
   if (!otp) {
-    return res.json({
+    return {
       ok: false,
       message: "OTP not found",
-    });
+    };
   }
 
   if (otp.code !== code) {
-    return res.json({
+    return {
       ok: false,
       message: "OTP does not match",
-    });
+    };
   }
 
   if (new Date(otp.updatedAt).getTime() + OTP_expiry * 1000 * 60 < Date.now()) {
-    return res.json({
+    return {
       ok: false,
       message: "OTP have expired",
-    });
+    };
   }
 
   let user = await (await USERS()).findOne({ email });
 
   if (!user) {
-    return res.json({
+    return {
       ok: false,
       message: "Platform not found",
-    });
+    };
   }
 
   const hashedPassword = hash(new_password);
@@ -417,31 +395,31 @@ const verify_forgot_password_otp = async (req, res) => {
     await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
   );
 
-  return res.json({
+  return {
     ok: true,
     message: "Password updated successfully",
-  });
+  };
 };
 
-const login_platform = async (req, res) => {
+const login_platform = async (req) => {
   let { email, password } = req.body;
 
   let user = await (await USERS()).findOne({ email });
 
   if (!user) {
-    return res.json({
+    return {
       ok: false,
       message: "Platform not found",
-    });
+    };
   }
 
   let pass = await (await PASSWORDS()).findOne({ _id: user._id });
 
   if (pass.key !== hash(password)) {
-    return res.json({
+    return {
       ok: false,
       message: "Incorrect password",
-    });
+    };
   }
 
   let setting = await retrieve_setting(user);
@@ -475,13 +453,13 @@ const login_platform = async (req, res) => {
       await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
     );
 
-    return res.json({
+    return {
       ok: !!response?.ok,
       message: !!response?.ok
         ? "OTP sent to your email. Verify to continue."
         : response?.message,
       data: { two_factor_auth: true, email },
-    });
+    };
   }
 
   let session_token = {
@@ -492,15 +470,15 @@ const login_platform = async (req, res) => {
   };
   await (await SESSIONS()).insertOne(session_token);
 
-  return res.json({
+  return {
     ok: true,
     message: "Login successful",
     session_token: session_token.token,
     data: user,
-  });
+  };
 };
 
-const retrieve_api_key = async (req, res) => {
+const retrieve_api_key = async (req) => {
   let user = req.headers.profile;
 
   let token = await (await TOKENS()).findOne({ user: user._id });
@@ -515,66 +493,66 @@ const retrieve_api_key = async (req, res) => {
     await (await TOKENS()).insertOne(token);
   }
 
-  res.json({
+  ({
     ok: true,
     message: "Key retrieved",
     data: { key: token.token },
   });
 };
 
-const two_factor_auth = async (req, res) => {
+const two_factor_auth = async (req) => {
   let { email, code } = req.body;
 
   let collection = await OTPS();
   let otp = await collection.findOne({ id: email });
 
   if (!otp) {
-    return res.json({
+    return {
       ok: false,
       message: "OTP not found",
-    });
+    };
   }
 
   if (otp.code !== code) {
-    return res.json({
+    return {
       ok: false,
       message: "OTP does not match",
-    });
+    };
   }
 
   if (new Date(otp.updatedAt).getTime() + OTP_expiry * 1000 * 60 < Date.now()) {
-    return res.json({
+    return {
       ok: false,
       message: "OTP have expired",
-    });
+    };
   }
 
   let user = await (await USERS()).findOne({ email });
 
   if (!user) {
-    return res.json({
+    return {
       ok: false,
       message: "Platform not found",
-    });
+    };
   }
 
-  return res.json({
+  return {
     ok: true,
     message: "Login successful",
     data: user,
-  });
+  };
 };
 
-const platform_by_uri = async (req, res) => {
+const platform_by_uri = async (req) => {
   let { uri } = await req.body;
 
   let plat = await (await USERS()).findOne({ uri });
 
-  res.json({
+  return {
     ok: true,
     message: "",
     data: plat,
-  });
+  };
 };
 
 export {
