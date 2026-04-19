@@ -10,7 +10,7 @@ class Headers {
     }
 
     let Tokens = await TOKENS();
-    ress = await Tokens.findOne({ token: api_key });
+    let ress = await Tokens.findOne({ token: api_key });
 
     if (!ress) {
       return { status: 403, message: "Invalid api keys.", ok: false };
@@ -99,6 +99,8 @@ class Headers {
       result = await this.resolve_authorisation_token(request);
       if (result !== true) return result;
     }
+
+    return true;
   };
 }
 

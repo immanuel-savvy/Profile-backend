@@ -36,132 +36,98 @@ class Route_table extends Headers {
 
   get_route = async (name) => this.routes[name];
 
-  // =========================
-  // 🧠 SCHEMA VALIDATION CORE
-  // =========================
-  schema_validation = async (schema, payload) => {
-    let body = payload.body || {};
-    let errors = [];
+  check_validation = async (rule, data) => {
+    let { prop, type, required, is_default } = rule;
 
-    const validate = (schemaNode, dataNode, path = "") => {
-      for (let key in schemaNode) {
-        if (key === "$logic") continue;
+    let data_value = data[prop];
 
-        let rule = schemaNode[key];
-        let value = dataNode[key];
-        let currentPath = path ? `${path}.${key}` : key;
+    data_value =
+      data_value == null || data_value == undefined ? is_default : data_value;
 
-        // required
-        if (rule.required && (value === undefined || value === null)) {
-          errors.push(currentPath);
-          continue;
-        }
+    if (required && (data_value == null || data_value == is_default))
+      return { ok: false, message: `Field '${prop}' is required` };
 
-        // default
-        if (rule.default !== undefined && value === undefined) {
-          dataNode[key] = rule.default;
-          value = rule.default;
-        }
-
-        if (value === undefined) continue;
-
-        // type
-        if (rule.type && !this.check_type(rule.type, value, rule)) {
-          errors.push(`${currentPath} (invalid type)`);
-          continue;
-        }
-
-        // enum
-        if (rule.type === "enum") {
-          let allowed = rule.values.split("|");
-          if (!allowed.includes(value)) {
-            errors.push(`${currentPath} (invalid enum)`);
-          }
-        }
-
-        // object struct recursion
-        if (rule.type === "object" && rule.struct) {
-          validate(rule.struct, value, currentPath);
-        }
-
-        // array items
-        if (rule.type === "array" && rule.items) {
-          for (let i = 0; i < value.length; i++) {
-            validate(
-              { item: rule.items[0] },
-              { item: value[i] },
-              `${currentPath}[${i}]`,
-            );
-          }
-        }
-
-        // custom validator
-        if (rule.validator && this.validators[rule.validator]) {
-          let res = this.validators[rule.validator](value);
-          if (!res.ok) errors.push(`${currentPath} (${res.message})`);
-        }
+    if (type) {
+      if (type.startsWith("/")) {
+      } else {
+        let type_of = typeof data_value;
+        if (type_of !== type)
+          return {
+            ok: false,
+            message: `Field '${prop}' must be of type '${type}'`,
+          };
       }
-    };
-
-    validate(schema.body || {}, body);
-
-    // =========================
-    // 🧠 LOGIC EVALUATION
-    // =========================
-    if (schema.$logic) {
-      let ok = this.evaluate_logic(schema.$logic, body);
-      if (!ok) {
-        errors.push("logical condition failed");
-      }
-    }
-
-    if (errors.length) {
-      return {
-        ok: false,
-        message: `Missing/Invalid: ${errors.join(", ")}`,
-      };
     }
 
     return { ok: true };
   };
 
-  // =========================
-  // 🔀 LOGIC ENGINE
-  // =========================
-  evaluate_logic = (logic, body) => {
-    if (logic.and) {
-      return logic.and.every((cond) => this.evaluate_logic(cond, body));
-    }
+  validate = async (schema, data) => {
+    let { body: schema_body } = schema;
+    let { body: data_body } = data;
 
-    if (logic.or) {
-      return logic.or.some((field) => {
-        if (typeof field === "string") {
-          return body[field] !== undefined;
+    for (let prop in schema_body) {
+      let rule = schema_body[prop];
+
+      if (prop === "$logic") {
+        let or_logic = rule.or;
+        if (or_logic) {
+          for (let o = 0; o < or_logic.length; o++) {
+            let or_rule = or_logic[o],
+              or_rule_check;
+
+            for (let proper of or_rule.properties) {
+              or_rule_check = await this.check_validation(
+                { prop: proper, ...or_rule },
+                data_body,
+              );
+
+              if (or_rule_check?.ok) break;
+            }
+            if (or_rule.required && !or_rule_check?.ok) {
+              return {
+                ok: false,
+                message: `At least one of the following fields is required: ${or_rule.properties.join(
+                  ", ",
+                )}`,
+              };
+            }
+          }
         }
-        return this.evaluate_logic(field, body);
-      });
+
+        let and_logic = rule.and;
+        if (and_logic) {
+          for (let a = 0; a < and_logic.length; a++) {
+            let and_rule = and_logic[a];
+
+            for (let prop of and_rule.properties) {
+              let and_rule_check = await this.check_validation(
+                { prop, ...and_rule },
+                data_body,
+              );
+
+              if (and_rule.required && !and_rule_check?.ok) {
+                return {
+                  ok: false,
+                  message: `Field '${prop}' is required`,
+                };
+              }
+            }
+          }
+        }
+      }
+
+      let validation_result = await this.check_validation(
+        { prop, ...rule },
+        data_body,
+      );
+
+      if (!validation_result.ok) {
+        return validation_result;
+      }
     }
 
-    return false;
-  };
-
-  // =========================
-  // 🧩 TYPE SYSTEM
-  // =========================
-  check_type = (type, value, rule = {}) => {
-    if (type === "string") return typeof value === "string";
-    if (type === "number") return typeof value === "number";
-    if (type === "object")
-      return !value && typeof value === "object" && !Array.isArray(value);
-    if (type === "array") return Array.isArray(value);
-    if (type === "any") return true;
-
-    // 🔗 reference types (future DB binding)
-    if (typeof type === "string" && type.startsWith("/")) {
-      return true;
-    }
-
-    return true;
+    return { ok: true };
   };
 
   // =========================
@@ -183,6 +149,12 @@ class Route_table extends Headers {
 
     // 🔐 security
     if (!this.check_security(config.security, payload)) {
+      console.log(
+        "Unauthorized access attempt to route:",
+        name,
+        "with payload:",
+        payload,
+      );
       return {
         ok: false,
         status: 401,
@@ -192,7 +164,10 @@ class Route_table extends Headers {
 
     // 📜 schema
     if (config.schema) {
-      let resp = await this.schema_validation(config.schema, payload);
+      let resp = await this.validate(config.schema, payload);
+
+      console.log("Validation result for route", name, ":", resp);
+
       if (!resp.ok) return resp;
     }
 

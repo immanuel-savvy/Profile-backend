@@ -201,9 +201,13 @@ const routes = {
         details: {
           type: "object",
           struct: {
-            $or: {
-              properties: ["email", "phone", "fullname"],
-              required: true,
+            $logic: {
+              or: [
+                {
+                  properties: ["email", "phone"],
+                  required: true,
+                },
+              ],
             },
           },
           required: true,
@@ -220,9 +224,13 @@ const routes = {
     security: "first",
     schema: {
       body: {
-        $or: {
-          properties: ["email", "phone"],
-          required: true,
+        $logic: {
+          or: [
+            {
+              properties: ["phone", "email"],
+              required: true,
+            },
+          ],
         },
         profile: {
           required: true,
@@ -242,9 +250,13 @@ const routes = {
       body: {
         code: { required: true, type: "string" },
         profile: { required: true, type: "/create_profile_type?data._id" },
-        $or: {
-          properties: ["email", "phone"],
-          required: true,
+        $logic: {
+          or: [
+            {
+              properties: ["email", "phone"],
+              required: true,
+            },
+          ],
         },
       },
     },
@@ -256,9 +268,13 @@ const routes = {
       body: {
         code: { required: true, type: "string" },
         profile: { required: true, type: "/create_profile_type?data._id" },
-        $or: {
-          properties: ["email", "phone"],
-          required: true,
+        $logic: {
+          or: [
+            {
+              properties: ["email", "phone"],
+              required: true,
+            },
+          ],
         },
       },
     },
@@ -268,9 +284,13 @@ const routes = {
     security: "first",
     schema: {
       body: {
-        $or: {
-          properties: ["email", "phone"],
-          required: true,
+        $logic: {
+          or: [
+            {
+              properties: ["email", "phone"],
+              required: true,
+            },
+          ],
         },
         profile: {
           required: true,
@@ -287,9 +307,9 @@ const routes = {
         new_password: { required: true, type: "string" },
         profile: { required: true, type: "/create_profile_type?data._id" },
         $logic: {
-          and: [
-            { or: { properties: ["email", "phone"], required: true } },
-            { or: { properties: ["code", "token"], required: true } },
+          or: [
+            { properties: ["email", "phone"], required: true },
+            { properties: ["code", "token"], required: true },
           ],
         },
       },
@@ -299,9 +319,13 @@ const routes = {
     handler: resend_profile_otp,
     security: "first",
     schema: {
-      $or: {
-        properties: ["email", "phone"],
-        required: true,
+      $logic: {
+        or: [
+          {
+            properties: ["email", "phone"],
+            required: true,
+          },
+        ],
       },
       kind: {
         type: "enum",
