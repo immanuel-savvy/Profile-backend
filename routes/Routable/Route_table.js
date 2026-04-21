@@ -37,7 +37,7 @@ class Route_table extends Headers {
   get_route = async (name) => this.routes[name];
 
   check_validation = async (rule, data) => {
-    let { prop, type, required, is_default } = rule;
+    let { prop, type, required, default: is_default } = rule;
 
     let data_value = data[prop];
 
@@ -47,6 +47,10 @@ class Route_table extends Headers {
     if (required && (data_value == null || data_value == is_default))
       return { ok: false, message: `Field '${prop}' is required` };
 
+    if (data_value == null) {
+      return { ok: true };
+    }
+
     if (type) {
       if (type.startsWith("/")) {
       } else {
@@ -54,7 +58,7 @@ class Route_table extends Headers {
         if (type_of !== type)
           return {
             ok: false,
-            message: `Field '${prop}' must be of type '${type}'`,
+            message: `Field '${prop}' must be of type '${type}' got '${type_of}'`,
           };
       }
     }

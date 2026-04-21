@@ -173,7 +173,7 @@ const routes = {
       body: {
         page: { default: 1, type: "number" },
         limit: { default: 20, type: "number" },
-        profile: { required: 1, type: "/create_profile_type?data._id" },
+        profile: { required: true, type: "/create_profile_type?data._id" },
         search: { type: "string" },
       },
     },
