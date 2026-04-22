@@ -75,9 +75,11 @@ class Headers {
     let ress = await Tokens.findOne({ token: authorisation });
 
     if (!ress)
-      return res.status(403).json({
+      return {
+        ok: true,
+        status: 403,
         error: "Invalid session token",
-      });
+      };
 
     let Sessions = await SESSIONS();
     let session = await Sessions.findOne({
@@ -86,17 +88,21 @@ class Headers {
     });
 
     if (!session) {
-      return res.status(403).json({
+      return {
+        ok: true,
+        status: 403,
         error: "Invalid session token",
-      });
+      };
     }
 
     if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
       await Sessions.deleteOne({ _id: session._id });
 
-      return res.status(403).json({
+      return {
+        ok: true,
+        status: 403,
         error: "Session expired",
-      });
+      };
     }
 
     let user = await (
@@ -106,9 +112,11 @@ class Headers {
     });
 
     if (!user) {
-      return res.status(403).json({
+      return {
+        ok: false,
+        status: 403,
         error: "User not found for session",
-      });
+      };
     }
 
     req.headers.profile = user;
