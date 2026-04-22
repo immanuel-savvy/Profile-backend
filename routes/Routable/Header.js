@@ -72,7 +72,7 @@ class Headers {
 
     let Tokens = await SESSIONS();
 
-    ress = await Tokens.findOne({ token: authorisation });
+    let ress = await Tokens.findOne({ token: authorisation });
 
     if (!ress)
       return res.status(403).json({
