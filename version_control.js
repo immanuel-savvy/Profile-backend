@@ -52,14 +52,14 @@ const version_middleware = (app) => {
         throw new Error("Security check failed");
       }
 
-      let services = await router.resolve_services(req, services_config);
+      // let services = await router.resolve_services(req, services_config);
 
       try {
         result = await router.execute(name, {
           body: req.body,
           headers: req.headers,
           db: db,
-          services: services,
+          // services: services,
         });
 
         await respond(result, res);

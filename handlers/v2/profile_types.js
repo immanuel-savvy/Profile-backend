@@ -6,7 +6,7 @@ const create_profile_type = async (req) => {
   let platform = req.headers.platform;
   let { name, description, ...rest } = req.body;
 
-  const Types = await db.get("profile_types");
+  const Types = await db.folder("profile_types");
 
   // 🔍 Check uniqueness (per platform)
   let exist = await Types.findOne({
@@ -44,7 +44,7 @@ const get_profile_types = async (req) => {
   let platform = req.headers.platform;
   let db = req.db;
 
-  const Types = await db.get("profile_types");
+  const Types = await db.folder("profile_types");
 
   let data = await Types.find({
     platform: platform._id,
@@ -62,7 +62,7 @@ const get_profile_type = async (req) => {
   let { name, _id } = req.body;
   let db = req.db;
 
-  const Types = await db.get("profile_types");
+  const Types = await db.folder("profile_types");
 
   let query = {
     platform: platform._id,
@@ -99,7 +99,7 @@ const update_profile_type = async (req) => {
   let { _id, update } = req.body;
   let db = req.db;
 
-  const Types = await db.get("profile_types");
+  const Types = await db.folder("profile_types");
 
   let query = { _id };
 
@@ -142,7 +142,7 @@ const get_profiles = async (req) => {
   limit = parseInt(limit) || 20;
   const skip = (page - 1) * limit;
 
-  const Profiles = await db.get("profiles");
+  const Profiles = await db.folder("profiles");
 
   const query = { profile };
 
@@ -182,7 +182,7 @@ const get_profiles_by_id = async (req) => {
   let { _ids } = req.body;
   let db = req.db;
 
-  const Profiles = await db.get("profiles");
+  const Profiles = await db.folder("profiles");
 
   let data = await Profiles.find({
     _id: { $in: _ids },
