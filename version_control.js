@@ -1,5 +1,6 @@
 import routerV1 from "./routes/routes-v1.js";
 import routerV2 from "./routes/routes-v2.js";
+import { default as services_config } from "./services/index.js";
 
 const routers = {
   v1: routerV1,
@@ -37,6 +38,8 @@ const version_middleware = (app) => {
       let name = req.path.slice(1),
         result;
 
+      let db = await router.resolve_db(req);
+
       try {
         result = await router.handle_security(name, req);
 
@@ -49,10 +52,14 @@ const version_middleware = (app) => {
         throw new Error("Security check failed");
       }
 
+      let services = await router.resolve_services(req, services_config);
+
       try {
         result = await router.execute(name, {
           body: req.body,
           headers: req.headers,
+          db: db,
+          services: services,
         });
 
         await respond(result, res);

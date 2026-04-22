@@ -1,12 +1,12 @@
 import crypto from "crypto";
-import { PROFILE_TYPES, PROFILES, USERS } from "../../ds/folders.js";
 
 // ➕ Create
 const create_profile_type = async (req) => {
+  let db = req.db;
   let platform = req.headers.platform;
   let { name, description, ...rest } = req.body;
 
-  const Types = await PROFILE_TYPES();
+  const Types = await db.get("profile_types");
 
   // 🔍 Check uniqueness (per platform)
   let exist = await Types.findOne({
@@ -42,8 +42,9 @@ const create_profile_type = async (req) => {
 // 📄 List all
 const get_profile_types = async (req) => {
   let platform = req.headers.platform;
+  let db = req.db;
 
-  const Types = await PROFILE_TYPES();
+  const Types = await db.get("profile_types");
 
   let data = await Types.find({
     platform: platform._id,
@@ -59,8 +60,9 @@ const get_profile_types = async (req) => {
 const get_profile_type = async (req) => {
   let platform = req.headers.platform;
   let { name, _id } = req.body;
+  let db = req.db;
 
-  const Types = await PROFILE_TYPES();
+  const Types = await db.get("profile_types");
 
   let query = {
     platform: platform._id,
@@ -95,8 +97,9 @@ const get_profile_type = async (req) => {
 const update_profile_type = async (req) => {
   let platform = req.headers.platform;
   let { _id, update } = req.body;
+  let db = req.db;
 
-  const Types = await PROFILE_TYPES();
+  const Types = await db.get("profile_types");
 
   let query = { _id };
 
@@ -133,11 +136,13 @@ const update_profile_type = async (req) => {
 
 const get_profiles = async (req) => {
   let { page = 1, limit = 20, profile, search } = req.body;
+  let db = req.db;
+
   page = parseInt(page) || 1;
   limit = parseInt(limit) || 20;
   const skip = (page - 1) * limit;
 
-  const Profiles = await PROFILES();
+  const Profiles = await db.get("profiles");
 
   const query = { profile };
 
@@ -175,8 +180,9 @@ const get_profiles = async (req) => {
 
 const get_profiles_by_id = async (req) => {
   let { _ids } = req.body;
+  let db = req.db;
 
-  const Profiles = await PROFILES();
+  const Profiles = await db.get("profiles");
 
   let data = await Profiles.find({
     _id: { $in: _ids },

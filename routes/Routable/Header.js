@@ -1,7 +1,37 @@
 import { PROFILES, SESSIONS, TOKENS, USERS } from "../../ds/folders.js";
+import { Mongo } from "@godprotocol/repositories";
+
+class DB {
+  constructor() {
+    this.db = new Mongo({
+      db_url: process.env.MONGODB_URI,
+      db_name: "savvy-profile",
+    });
+
+    this.folders = {};
+  }
+
+  folder = async (name) => {
+    let folder = this.folders[name];
+
+    if (folder) return folder;
+
+    folder = this.db.collection(name);
+    this.folders[name] = folder;
+
+    return folder;
+  };
+}
 
 class Headers {
   constructor() {}
+
+  resolve_db = async (req) => {
+    // Retrieve db user token;
+    req.db = new DB();
+
+    return req.db;
+  };
 
   resolve_api_key = async (req) => {
     let api_key = req.headers["x-api-key"];
@@ -98,6 +128,19 @@ class Headers {
     if (security.includes("bearer_token")) {
       result = await this.resolve_authorisation_token(request);
       if (result !== true) return result;
+    }
+    if (request.headers["x-platform"]) {
+      let platform = request.headers["x-platform"];
+      let Platforms = await USERS();
+      let res = await Platforms.findOne({ uri: platform });
+      if (!res) {
+        return {
+          status: 403,
+          message: "Invalid platform in x-platform header",
+          ok: false,
+        };
+      }
+      request.headers.third_party_platform = res;
     }
 
     return true;

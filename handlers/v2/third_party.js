@@ -28,14 +28,16 @@ export const encryptToken = (payload, secret) => {
 const get_token = async (req) => {
   let platform = req.headers.platform;
   let { profile, platform_uri } = req.body;
+  let db = req.db;
 
   let platform_doc = await (await USERS()).findOne({ uri: platform_uri });
 
   console.log(platform_doc, "platform doc for token request");
   console.log(profile, "profile for token request");
   console.log(platform, "platform for token request");
+
   let sess = await (
-    await SESSIONS()
+    await db.folder("sessions")
   ).findOne({
     platform: platform_doc._id,
     platform_profile: profile,
