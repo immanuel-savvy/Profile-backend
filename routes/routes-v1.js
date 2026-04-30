@@ -81,7 +81,8 @@ const router = async (req, res) => {
     console.error("Router Error:", err);
 
     return res.status(500).json({
-      error: "Internal server error",
+      ok: false,
+      message: "Internal server error",
     });
   }
 };

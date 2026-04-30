@@ -39,7 +39,6 @@ const signup = async (req, res) => {
   } = req.body;
   verification_means = VERIFICATION_MEANS[verification_means || "email"];
 
-  console.log(platform, profile_id, data, password);
   // data-> email, firstname, lastname, bio, ... (phone)
 
   if (social) {

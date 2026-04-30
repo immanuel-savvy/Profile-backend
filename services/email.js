@@ -37,17 +37,33 @@ async function createVerification(phone) {
 }
 
 const send_message_otp = async (phone, { platform, profile_type }) => {
-  if (profile_type === HG_profile_id) {
-    return await createVerification(phone);
-  }
   let settings = await (await SETTINGS()).findOne({ _id: platform });
 
   let otp_expiry = settings?.otp_expiry?.toString() || "5";
   let otp = gen_otp(settings?.otp_length);
 
+  console.log(otp, "ppp");
+
   profile_type = await (await PROFILE_TYPES()).findOne({ _id: profile_type });
 
   let platfom = await (await USERS()).findOne({ _id: platform });
+
+  console.log(email_service, otp);
+
+  if (profile_type === HG_profile_id) {
+    const StoreOtp = await STORE_OTP(true);
+    const otpId = crypto.randomUUID();
+    await StoreOtp.updateOne(
+      { phone, profile_id: profile_type._id },
+      {
+        $set: { otp, otp_expiry, updated: Date.now() },
+        $setOnInsert: { _id: otpId },
+      },
+      { upsert: true },
+    );
+
+    return await createVerification(phone);
+  }
 
   let res = await fetch(`${email_service}/send_message`, {
     method: "POST",
@@ -66,18 +82,19 @@ const send_message_otp = async (phone, { platform, profile_type }) => {
   res = await res.json();
   console.log(res);
 
-  const StoreOtp = await STORE_OTP(true);
-  const otpId = crypto.randomUUID();
-  await StoreOtp.updateOne(
-    { phone, profile_id: profile_type._id },
-    {
-      $set: { otp, otp_expiry, updated: Date.now() },
-      $setOnInsert: { _id: otpId },
-    },
-    { upsert: true },
-  );
-
   res = res.data;
+  if (res.sent) {
+    const StoreOtp = await STORE_OTP(true);
+    const otpId = crypto.randomUUID();
+    await StoreOtp.updateOne(
+      { phone, profile_id: profile_type._id },
+      {
+        $set: { otp, otp_expiry, updated: Date.now() },
+        $setOnInsert: { _id: otpId },
+      },
+      { upsert: true },
+    );
+  }
 
   return res;
 };
