@@ -210,6 +210,7 @@ const verify_profile = async (req, res) => {
   let { email, code, phone, profile, verification_means } = req.body;
   verification_means = VERIFICATION_MEANS[verification_means || "email"];
 
+  console.log(req.body);
   if (email) email = email.trim().toLowerCase();
   code = code.trim();
 

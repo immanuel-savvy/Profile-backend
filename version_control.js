@@ -1,11 +1,4 @@
-import routerV1 from "./routes/routes-v1.js";
-import routerV2 from "./routes/routes-v2.js";
-import { default as services_config } from "./services/index.js";
-
-const routers = {
-  v1: routerV1,
-  v2: routerV2,
-};
+import routers from "./routes/index.js";
 
 const respond = async (result, res) => {
   let response = {
@@ -24,9 +17,10 @@ const version_middleware = (app) => {
     try {
       const version = req.headers["x-api-version"] || "v1";
 
-      const router = routers[version];
+      let router = routers.get_version(version);
 
-      if (version === "v1") return router(req, res);
+      console.log(router);
+      if (router.config?.is_old) return router.routes(req, res);
 
       if (!router) {
         return res.status(400).json({
@@ -35,13 +29,14 @@ const version_middleware = (app) => {
         });
       }
 
+      router = routers;
+
       let name = req.path.slice(1),
         result;
 
-      let db = await router.resolve_db(req);
-
       try {
         result = await router.handle_security(name, req);
+        console.log(result, "UHH");
 
         if (result !== true) {
           return await respond(result, res);
@@ -52,14 +47,17 @@ const version_middleware = (app) => {
         throw new Error("Security check failed");
       }
 
-      // let services = await router.resolve_services(req, services_config);
+      let services = await router.resolve_services(
+        req,
+        await router.get_route_config(name),
+      );
 
       try {
         result = await router.execute(name, {
           body: req.body,
           headers: req.headers,
-          db: db,
-          // services: services,
+          db: services?.db,
+          services: services,
         });
 
         await respond(result, res);

@@ -32,12 +32,8 @@ import {
   third_party_auth,
   third_party_signin,
 } from "../handlers/v2/third_party.js";
-import { validate } from "../handlers/v2/validate.js";
+import { validate, validate_third_party } from "../handlers/v2/validate.js";
 import { normalise_email } from "../handlers/v2/middlewares/middlewares.js";
-import Route_table from "./Routable/Route_table.js";
-import { type } from "os";
-
-let routable = new Route_table();
 
 let body_norm_email = async (payload) => {
   let res = await normalise_email(payload.body.email);
@@ -50,7 +46,19 @@ let body_norm_email = async (payload) => {
 };
 // 🔑 Route map (KV store)
 const routes = {
-  validate: { handler: validate, security: "both" },
+  validate: { handler: validate, security: "none" },
+  validate_third_party: {
+    handler: validate_third_party,
+    security: "none",
+    schema: {
+      body: {
+        xplatform: {
+          type: "/new_platform?data.uri",
+          required: true,
+        },
+      },
+    },
+  },
 
   // Platform
   new_platform: {
@@ -377,6 +385,4 @@ const routes = {
   },
 };
 
-await routable.load_routes(routes);
-
-export default routable;
+export default routes;

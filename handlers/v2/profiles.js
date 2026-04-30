@@ -94,14 +94,10 @@ const send_message = async (
 const create_profile = async ({ platform, details, type }) => {
   let setting = await retrieve_setting(platform);
 
-  console.log(setting, "SETTINGS");
-
   let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
     query: "and",
   };
-
-  console.log(uids);
 
   if (!uids || !uids.properties?.length) {
     uids = { properties: ["email"], query: "and" };

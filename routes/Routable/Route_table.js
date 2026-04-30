@@ -9,11 +9,29 @@ let securities = {
 };
 
 class Route_table extends Headers {
-  constructor() {
+  constructor(db_config) {
+    console.log(db_config);
     super();
-    this.routes = {};
+
+    this.db_config = db_config;
+    this.versions = {};
     this.validators = {};
   }
+
+  get_version = (version) => {
+    let ver = this.versions[version];
+    if (!ver) return;
+
+    this.active_version = version;
+
+    return ver;
+  };
+
+  init_version = async (version, config) => {
+    this.versions[version] = { config, routes: {} };
+
+    this.active_version = version;
+  };
 
   // 🔌 extensibility
   register_validator = (name, fn) => {
@@ -31,10 +49,10 @@ class Route_table extends Headers {
   };
 
   add_route = async (name, handler, config) => {
-    this.routes[name] = { handler, config };
+    this.versions[this.active_version].routes[name] = { handler, config };
   };
 
-  get_route = async (name) => this.routes[name];
+  get_route = async (name) => this.versions[this.active_version].routes[name];
 
   check_validation = async (rule, data) => {
     let { prop, type, required, default: is_default } = rule;
@@ -134,6 +152,12 @@ class Route_table extends Headers {
     return { ok: true };
   };
 
+  get_route_config = async (name) => {
+    let rot = await this.get_route(name);
+
+    return rot.config;
+  };
+
   // =========================
   // 🚀 EXECUTION PIPELINE
   // =========================
@@ -150,21 +174,6 @@ class Route_table extends Headers {
     }
 
     let { handler, config } = route;
-
-    // 🔐 security
-    if (!this.check_security(config.security, payload)) {
-      console.log(
-        "Unauthorized access attempt to route:",
-        name,
-        "with payload:",
-        payload,
-      );
-      return {
-        ok: false,
-        status: 401,
-        message: "Unauthorized",
-      };
-    }
 
     // 📜 schema
     if (config.schema) {
@@ -183,23 +192,6 @@ class Route_table extends Headers {
 
     // 🎯 handler
     return await handler(payload);
-  };
-
-  // =========================
-  // 🔐 SECURITY ENGINE
-  // =========================
-  check_security = (requirements, payload) => {
-    if (!requirements?.length) return true;
-
-    let headers = payload.headers || {};
-
-    let checks = {
-      api_key: () => !!headers["x-api-key"],
-      bearer_token: () => !!headers["authorization"],
-      xplatform: () => !!headers["x-platform"],
-    };
-
-    return requirements.every((r) => checks[r]?.());
   };
 }
 

@@ -1,11 +1,14 @@
 import { PROFILES, SESSIONS, TOKENS, USERS } from "../../ds/folders.js";
 import { Mongo } from "@godprotocol/repositories";
+import { post_request } from "../../utils/services.js";
+import Services from "./Services.js";
+import { decryptToken, encryptToken } from "../../handlers/v2/third_party.js";
 
 class DB {
-  constructor() {
+  constructor(db_name, config) {
     this.db = new Mongo({
-      db_url: process.env.MONGODB_URI,
-      db_name: "savvy-profile",
+      db_url: config.db_url,
+      db_name: db_name.replace(/\./g, "-"),
     });
 
     this.folders = {};
@@ -23,132 +26,202 @@ class DB {
   };
 }
 
-class Headers {
-  constructor() {}
+class Headers extends Services {
+  constructor() {
+    super();
+  }
 
-  resolve_db = async (req) => {
-    // Retrieve db user token;
-    req.db = new DB();
+  validate_api_key = async (api_key, authorization) => {
+    let db = await this.platform_db(this.gp_uri);
+    let cache = await db.folder("caches");
+    let reslt = await cache.findOne({
+      api_key: encryptToken(api_key, process.env.API_KEY),
+      authorization,
+      platform: process.env.PLATFORM_URI,
+    });
 
-    return req.db;
+    if (reslt)
+      if (reslt.expiry && new Date(reslt.expiry) < new Date())
+        await cache.deleteOne({ _id: reslt._id });
+      else {
+        let parsed;
+
+        try {
+          parsed = JSON.parse(decryptToken(reslt.payload, process.env.API_KEY));
+        } catch (e) {
+          parsed = null;
+        }
+
+        if (parsed) return { ok: true, data: parsed };
+      }
+
+    let headers = {
+      "x-api-version": "v2",
+      "x-api-key": api_key,
+    };
+    if (authorization) {
+      headers["Authorization"] = `Bearer ${authorization}`;
+    }
+    let res = await post_request(`$PROFILE/validate`, {}, headers);
+
+    if (res.ok) {
+      await cache.updateOne(
+        {
+          api_key: encryptToken(api_key, process.env.API_KEY),
+          authorization,
+          platform: process.env.PLATFORM_URI,
+        },
+        {
+          $set: {
+            payload: encryptToken(
+              JSON.stringify(res.data),
+              process.env.API_KEY,
+            ),
+            expiry: res.data.expiry,
+          },
+          $setOnInsert: {
+            _id: crypto.randomUUID(),
+            created: new Date(),
+            api_key: encryptToken(api_key, process.env.API_KEY),
+            authorization,
+            platform: process.env.PLATFORM_URI,
+          },
+        },
+        {
+          upsert: true,
+        },
+      );
+    }
+
+    return res;
   };
 
-  resolve_api_key = async (req) => {
-    let api_key = req.headers["x-api-key"];
-    if (!api_key) {
-      return { status: 403, message: "API key is missing", ok: false };
-    }
-
-    let Tokens = await TOKENS();
-    let ress = await Tokens.findOne({ token: api_key });
-
-    if (!ress) {
-      return { status: 403, message: "Invalid api keys.", ok: false };
-    }
-    let user = await (
-      await USERS()
-    ).findOne({
-      _id: ress.user,
+  validate_third_party = async (xplatform, authorization) => {
+    let db = await this.platform_db(this.gp_uri);
+    let cache = await db.folder("caches");
+    let reslt = await cache.findOne({
+      authorization,
+      xplatform,
+      platform: process.env.PLATFORM_URI,
     });
-    if (!user) {
-      return {
-        status: 403,
-        message: "User not found for api key",
-        ok: false,
-      };
+
+    if (reslt)
+      if (reslt.expiry && new Date(reslt.expiry) < new Date())
+        await cache.deleteOne({ _id: reslt._id });
+      else {
+        let parsed;
+
+        try {
+          parsed = JSON.parse(decryptToken(reslt.payload, process.env.API_KEY));
+        } catch (e) {
+          parsed = null;
+        }
+
+        if (parsed) return { ok: true, data: parsed };
+      }
+
+    let headers = {
+      "x-api-version": "v2",
+      "x-api-key": process.env.API_KEY,
+    };
+    if (authorization) {
+      headers["Authorization"] = `Bearer ${authorization}`;
+    }
+    let res = await post_request(
+      `$PROFILE/validate_third_party`,
+      { platform_uri: xplatform },
+      headers,
+    );
+
+    if (res.ok) {
+      await cache.updateOne(
+        {
+          authorization,
+          xplatform,
+          platform: process.env.PLATFORM_URI,
+        },
+        {
+          $set: {
+            payload: encryptToken(
+              JSON.stringify(res.data),
+              process.env.API_KEY,
+            ),
+            expiry: res.data.expiry,
+          },
+          $setOnInsert: {
+            _id: crypto.randomUUID(),
+            created: new Date(),
+            authorization,
+            xplatform,
+            platform: process.env.PLATFORM_URI,
+          },
+        },
+        {
+          upsert: true,
+        },
+      );
     }
 
-    req.headers.platform = user;
-
-    return true;
+    return res;
   };
 
-  resolve_authorisation_token = async (req) => {
-    let authorisation = req.headers["authorization"];
-    authorisation = authorisation.replace("Bearer ", "");
+  check_security = (requirements, payload) => {
+    if (!requirements?.length) return true;
 
-    if (!authorisation)
-      return { status: 403, message: "Beaere Token is missing", ok: false };
+    let headers = payload.headers || {};
 
-    let Tokens = await SESSIONS();
+    let checks = {
+      api_key: () => !!headers["x-api-key"],
+      bearer_token: () => !!headers["authorization"],
+      xplatform: () => !!headers["x-platform"],
+    };
 
-    let ress = await Tokens.findOne({ token: authorisation });
-
-    if (!ress)
-      return {
-        ok: true,
-        status: 403,
-        error: "Invalid session token",
-      };
-
-    let Sessions = await SESSIONS();
-    let session = await Sessions.findOne({
-      // platform: { $exists: 0 },
-      token: authorisation,
-    });
-
-    if (!session) {
-      return {
-        ok: true,
-        status: 403,
-        error: "Invalid session token",
-      };
-    }
-
-    if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
-      await Sessions.deleteOne({ _id: session._id });
-
-      return {
-        ok: true,
-        status: 403,
-        error: "Session expired",
-      };
-    }
-
-    let user = await (
-      session?.platform ? await PROFILES() : await USERS()
-    ).findOne({
-      _id: session.user,
-    });
-
-    if (!user) {
-      return {
-        ok: false,
-        status: 403,
-        error: "User not found for session",
-      };
-    }
-
-    req.headers.profile = user;
-
-    return true;
+    return requirements.every((r) => checks[r]?.());
   };
 
   handle_security = async (name, request) => {
-    let route = await this.get_route(name),
-      result;
+    let route = await this.get_route(name);
 
-    let security = route.config.security;
-    if (security.includes("api_key")) {
-      result = await this.resolve_api_key(request);
-      if (result !== true) return result;
+    if (!route.config.security?.length) return true;
+
+    if (!this.check_security(route.config.security, request)) {
+      console.log("Unauthorized access attempt to route:", name);
+      return {
+        ok: false,
+        status: 401,
+        message: "Unauthorized",
+      };
     }
-    if (security.includes("bearer_token")) {
-      result = await this.resolve_authorisation_token(request);
-      if (result !== true) return result;
+
+    let xplatform = request.headers["x-platform"],
+      api_key = request.headers["x-api-key"],
+      authorisation = request.headers["Authorization"];
+    if (authorisation) authorisation = authorisation.replace("Bearer ", "");
+
+    let val;
+    if (xplatform) {
+      val = await this.validate_third_party(xplatform, authorisation);
+    } else {
+      console.log(api_key, authorisation);
+      val = await this.validate_api_key(api_key, authorisation);
+      console.log(val, "Uhh");
     }
-    if (request.headers["x-platform"]) {
-      let platform = request.headers["x-platform"];
-      let Platforms = await USERS();
-      let res = await Platforms.findOne({ uri: platform });
-      if (!res) {
+
+    console.log(val);
+    if (!val?.ok) {
+      return val;
+    } else {
+      val = val.data;
+      if (!val) {
         return {
-          status: 403,
-          message: "Invalid platform in x-platform header",
           ok: false,
+          message: "malformed header validation",
+          status: 403,
         };
       }
-      request.headers.third_party_platform = res;
+      request.headers.profile = val.profile;
+      request.headers.xplatform = val.xplatform;
+      request.headers.platform = val.platform;
     }
 
     return true;
@@ -156,3 +229,4 @@ class Headers {
 }
 
 export default Headers;
+export { DB };

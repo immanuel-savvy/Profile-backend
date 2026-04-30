@@ -8,7 +8,35 @@ const deriveKey = (secret) =>
  * Encrypt a value (usually a session token) using AES-256-GCM.
  * Returns a compact base64 string encoding iv|authTag|ciphertext.
  */
-export const encryptToken = (payload, secret) => {
+const decryptToken = (enc, secret) => {
+  if (!enc) return null;
+
+  try {
+    const key = deriveKey(secret);
+
+    const parts = enc.split(":");
+    if (parts.length < 3) throw new Error("Invalid token format");
+
+    const iv = Buffer.from(parts[0], "base64");
+    const tag = Buffer.from(parts[1], "base64");
+    const data = Buffer.from(parts.slice(2).join(":"), "base64");
+
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
+    decipher.setAuthTag(tag);
+
+    const decrypted = Buffer.concat([
+      decipher.update(data),
+      decipher.final(),
+    ]).toString("utf8");
+
+    return JSON.parse(decrypted);
+  } catch (err) {
+    console.error("❌ Decrypt failed:", err.message);
+    return null;
+  }
+};
+
+const encryptToken = (payload, secret) => {
   const key = deriveKey(secret);
   const iv = randomBytes(12); // GCM standard
 
@@ -27,10 +55,19 @@ export const encryptToken = (payload, secret) => {
 
 const get_token = async (req) => {
   let platform = req.headers.platform;
-  let { profile, platform_uri } = req.body;
+  let { profile, platform: platform_instead, platform_uri } = req.body;
   let db = req.db;
 
-  let platform_doc = await (await USERS()).findOne({ uri: platform_uri });
+  if (platform_instead) {
+    profile = await (
+      await db.folder("profiles")
+    ).findOne({ _id: platform_instead._id });
+    profile = profile._id;
+  }
+
+  let platform_doc = await (
+    await db.folder("Users")
+  ).findOne({ uri: platform_uri });
 
   console.log(platform_doc, "platform doc for token request");
   console.log(profile, "profile for token request");
@@ -279,4 +316,11 @@ const signup_with = async (req) => {
   };
 };
 
-export { third_party_signin, third_party_auth, get_token, signup_with };
+export {
+  third_party_signin,
+  third_party_auth,
+  get_token,
+  signup_with,
+  encryptToken,
+  decryptToken,
+};

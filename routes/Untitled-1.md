@@ -19,3 +19,21 @@ It should be present, and have a valid profile to it.
 Which is returned.
 
 
+// Signup_with aka third party signup
+You provide in the hearder, the xplatform which is the authorised platform
+You provide the authorisation from the xplatform profile,
+and the api_key to the requesting platform.
+
+In the body, you provide permissions checked to pass down to the requesting platform that the authorised platform already has.
+These permissions are basically other services that may have been granted access to the xplatform by their profile.
+And profile_type of the platform where the profile will be.
+
+The shape of the permissions is an array of services uris.
+
+So now how does the header information get used to create their profile x.
+From the authorisation, we derive the profile.
+From the platform we retrieve its setting to get its profile schema.
+The profile schema is used to collect the values from the authorised profile,
+and then inserted into the profiles of the platform along with profiletype, and platform id.
+
+A webhook is further sent to the xplatform carrying the platform, profile, and xprofile.

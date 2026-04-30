@@ -5,7 +5,7 @@ import { HG_profile_id } from "../handlers/v1/profile.js";
 import twilio from "twilio";
 
 let base_domain = `savvyaisolution.com`;
-let PROD = process.env.PROD || false;
+let PROD = process.env.PROD || true;
 let email_service = PROD
   ? `https://email-api.${base_domain}`
   : `http://localhost:4003`;
@@ -64,21 +64,20 @@ const send_message_otp = async (phone, { platform, profile_type }) => {
   });
 
   res = await res.json();
+  console.log(res);
 
-  if (res?.data?.sent) {
-    const StoreOtp = await STORE_OTP(true);
-    const otpId = crypto.randomUUID();
-    await StoreOtp.updateOne(
-      { phone, profile_id: profile_type._id },
-      {
-        $set: { otp, otp_expiry, updated: Date.now() },
-        $setOnInsert: { _id: otpId },
-      },
-      { upsert: true },
-    );
+  const StoreOtp = await STORE_OTP(true);
+  const otpId = crypto.randomUUID();
+  await StoreOtp.updateOne(
+    { phone, profile_id: profile_type._id },
+    {
+      $set: { otp, otp_expiry, updated: Date.now() },
+      $setOnInsert: { _id: otpId },
+    },
+    { upsert: true },
+  );
 
-    res = res.data;
-  }
+  res = res.data;
 
   return res;
 };
@@ -183,20 +182,18 @@ const send_profile_otp = async (
   });
   res = await res.json();
 
-  if (res?.data?.sent) {
-    const StoreOtp = await STORE_OTP(true);
-    const otpId = crypto.randomUUID();
-    await StoreOtp.updateOne(
-      { email, profile_id: profile_type._id },
-      {
-        $set: { otp, otp_expiry, updated: Date.now() },
-        $setOnInsert: { _id: otpId },
-      },
-      { upsert: true },
-    );
+  const StoreOtp = await STORE_OTP(true);
+  const otpId = crypto.randomUUID();
+  await StoreOtp.updateOne(
+    { email, profile_id: profile_type._id },
+    {
+      $set: { otp, otp_expiry, updated: Date.now() },
+      $setOnInsert: { _id: otpId },
+    },
+    { upsert: true },
+  );
 
-    res = res.data;
-  }
+  res = res.data;
 
   return res;
 };
