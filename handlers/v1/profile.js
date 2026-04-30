@@ -149,7 +149,6 @@ async function checkVerification(code, phone) {
       code,
     });
 
-  console.log(verificationCheck.status);
   return verificationCheck.status;
 }
 
