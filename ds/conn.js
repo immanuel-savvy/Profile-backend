@@ -6,7 +6,7 @@ const conn = () => {
 
   let db = new Mongo({
     db_url: process.env.MONGODB_URI,
-    db_name: "savvy-profile",
+    db_name: process.env.PLATFORM_URI,
   });
 
   db_instance = db;

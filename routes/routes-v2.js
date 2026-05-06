@@ -378,6 +378,7 @@ const routes = {
   get_token: {
     handler: get_token,
     security: "first",
+    no_db: true,
     schema: {
       profile: { required: true, type: "/add_profile?data._id" },
       platform_uri: { required: true, type: "/new_platform?data.uri" },

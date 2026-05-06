@@ -1,4 +1,3 @@
-import { PROFILE_TYPES, PROFILES, SESSIONS, USERS } from "../../ds/folders.js";
 import { retrieve_setting, signin_user } from "./profiles.js";
 import crypto, { createHash, randomBytes, createCipheriv } from "crypto";
 
@@ -57,6 +56,7 @@ const get_token = async (req) => {
   let platform = req.headers.platform;
   let { profile, platform: platform_instead, platform_uri } = req.body;
   let db = req.db;
+  console.log("getting token");
 
   if (platform_instead) {
     profile = await (
@@ -74,7 +74,7 @@ const get_token = async (req) => {
   console.log(platform, "platform for token request");
 
   let sess = await (
-    await db.folder("sessions")
+    await db.folder("Sessions")
   ).findOne({
     platform: platform_doc._id,
     platform_profile: profile,
@@ -90,10 +90,12 @@ const get_token = async (req) => {
     };
   }
 
+  console.log("DID WE EVEN GET HERE", sess);
+
   return {
     ok: true,
     message: "Token retrieved",
-    token: encryptToken(sess?.token, req.headers["x-api-key"]),
+    token: sess?.token,
   };
 };
 
@@ -103,12 +105,19 @@ const third_party_signin = async (req) => {
   let { details: body, platform_profile } = req.body;
 
   console.log(platform, profile, platform_profile);
-  let result = await signin_user({
-    platform: await (await USERS()).findOne({ _id: profile.platform }),
-    body: { ...body, profile: profile.profile },
-    platform_profile,
-    third_party_platform: platform,
-  });
+  let db = req.db;
+
+  let result = await signin_user(
+    {
+      platform: await (
+        await db.folder("Users")
+      ).findOne({ _id: profile.platform }),
+      body: { ...body, profile: profile.profile },
+      platform_profile,
+      third_party_platform: platform,
+    },
+    req,
+  );
 
   return result;
 };
@@ -124,12 +133,15 @@ const third_party_auth = async (req) => {
       message: "Authorization token required",
     };
   }
+  let db = req.db;
 
   authorization = authorization.replace("Bearer ", "");
 
-  const Sessions = await SESSIONS();
+  const Sessions = await db.folder("Sessions");
 
-  let xplatform_user = await (await USERS()).findOne({ uri: xplatform });
+  let xplatform_user = await (
+    await db.folder("Users")
+  ).findOne({ uri: xplatform });
 
   if (!xplatform_user) {
     return {
@@ -170,7 +182,7 @@ const third_party_auth = async (req) => {
   // ✅ Attach session + user to request
 
   let user = await (
-    await PROFILES()
+    await db.folder("profiles")
   ).findOne({
     _id: session.user,
   });
@@ -194,12 +206,19 @@ const signup_with = async (req) => {
     profile,
   } = req.headers;
   let { permissions, profile_type } = req.body;
+  let db = req.db;
 
-  let xplatform = await (await USERS()).findOne({ uri: xplatform_uri });
+  let xplatform = await (
+    await db.folder("Users")
+  ).findOne({ uri: xplatform_uri });
 
-  let setting = await retrieve_setting(platform, {
-    category: ["webhooks", "identity", "profile_schema"],
-  });
+  let setting = await retrieve_setting(
+    platform,
+    {
+      category: ["webhooks", "identity", "profile_schema"],
+    },
+    { req },
+  );
 
   let { profile_schema, identity, webhooks } = setting || {};
   if (!identity) {
@@ -239,7 +258,7 @@ const signup_with = async (req) => {
     }
   }
 
-  let Profiles = await PROFILES();
+  let Profiles = await db.folder("profiles");
   if (Object.keys(xprofile).length) {
     let exists = await Profiles.findOne({
       $or: xprofile,
@@ -284,7 +303,7 @@ const signup_with = async (req) => {
 
   await Profiles.insertOne(xprofile);
 
-  const Sessions = await SESSIONS();
+  const Sessions = await db.folder("Sessions");
 
   let sess = {
     _id: crypto.randomUUID(),

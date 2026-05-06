@@ -1,25 +1,13 @@
-import Route_table from "./Routable/Route_table.js";
 import routesv1 from "./routes-v1.js";
 import routesv2 from "./routes-v2.js";
 
-let router = async () => {
+let router = async (gp) => {
   console.log(process.env.API_KEY);
-  let routeable;
 
-  routeable = new Route_table();
-  await routeable.init_version("v1", { is_old: true });
-  routeable.versions["v1"].routes = routesv1;
+  await gp.add_router("v1", routesv1, { is_old: true });
+  await gp.add_router("v2", routesv2);
 
-  await routeable.init_version("v2");
-  await routeable.load_routes(routesv2);
-
-  setTimeout(() => {
-    routeable.db_config = {
-      db_url: process.env.MONGODB_URI,
-    };
-  }, 100);
-
-  return routeable;
+  // await gp.route_table.get_route("new_platform");
 };
 
-export default await router();
+export default router;

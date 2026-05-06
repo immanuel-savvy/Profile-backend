@@ -1,7 +1,6 @@
 const validate = async (req) => {
   const headers = req.headers || {};
 
-  console.log(headers);
   const api_key = headers["x-api-key"];
   if (!api_key) {
     return { ok: false, message: "API key is required", status: 403 };
@@ -14,6 +13,7 @@ const validate = async (req) => {
 
   const db = req.db;
 
+  console.log(db, "WHAT IS HERE?");
   const Tokens = await db.folder("Tokens");
   const pload = await Tokens.findOne({ token: api_key });
 

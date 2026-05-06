@@ -1,29 +1,12 @@
-import {
-  OTPS,
-  PASSWORDS,
-  PENDING_USERS,
-  PROFILES,
-  SESSIONS,
-  TOKENS,
-  USERS,
-} from "../../ds/folders.js";
 import crypto from "crypto";
 import { hash } from "../../utils/hash.js";
-import { retrieve_setting, service_auth } from "./profiles.js";
-import { email_service } from "../../services/email.js";
+import { retrieve_setting } from "./profiles.js";
 
 let Platform_profile_type_id = "platform_profile_type_id"; // profile type id for platforms
 
 export { Platform_profile_type_id };
 
-const send_mail = async ({ from, to, content }, platform) => {
-  let auth = await service_auth(platform, "aimail.savvyaisolution.com");
-
-  console.log(auth, platform, "WHAT?");
-  if (!auth) {
-    return;
-  }
-
+const send_mail = async ({ from, to, content }, profile, req) => {
   if (content?.variables?.profile) {
     let profile = content.variables.profile;
     content.variables.profile = {
@@ -32,31 +15,26 @@ const send_mail = async ({ from, to, content }, platform) => {
     };
   }
 
-  let response = await fetch(`${email_service}/send_mail`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Accept: "application/json",
-      "x-api-version": "v2",
-      "x-platform": `profile.savvyaisolution.com`,
-      Authorization: `Bearer ${auth}`,
-    },
-    body: JSON.stringify({
+  console.log(req);
+  let email_service = await req.services("aimail");
+  console.log(email_service, "uhh");
+  let response = email_service.call(
+    "send_mail",
+    {
       from,
       to,
       content,
-    }),
-  });
-
-  response = response.json();
+    },
+    { profile: profile._id },
+  );
 
   return response;
 };
 
 const generate_otp = async (id, sub, opts = {}) => {
-  let { expiry = 5, length = 6, meta } = opts || {};
+  let { expiry = 5, length = 6, meta, req } = opts || {};
 
-  const collection = await OTPS(sub);
+  const collection = await req.db.folder(`OTPS:${sub || "general"}`);
 
   // Ensure valid length
   if (length < 1) throw new Error("OTP length must be at least 1");
@@ -90,9 +68,10 @@ const OTP_expiry = 5;
 
 const add_platform = async (req) => {
   let { email, name, password } = req.body;
+  let db = req.db;
 
-  const Users = await USERS();
-  const Pending = await PENDING_USERS();
+  const Users = await db.folder("Users");
+  const Pending = await db.folder("Pending_users");
 
   // Normalize inputs
   const cleanName = name.replace(/\s+/g, "").toLowerCase();
@@ -106,6 +85,7 @@ const add_platform = async (req) => {
     $or: [{ email }, { name }],
   });
 
+  console.log(exist, req.body, "newplatform bdy");
   if (exist) {
     let msg;
 
@@ -147,7 +127,7 @@ const add_platform = async (req) => {
 
   // Generate OTP
 
-  const otp = await generate_otp(email);
+  const otp = await generate_otp(email, null, { req });
 
   // Send mail
   const mail_res = await send_mail(
@@ -167,10 +147,11 @@ const add_platform = async (req) => {
       },
     },
     await (
-      await PROFILES()
+      await db.folder("profiles")
     ).findOne({
       _id: process.env.PROFILE_ID,
     }),
+    req,
   );
 
   return {
@@ -185,7 +166,8 @@ const add_platform = async (req) => {
 const verify_platform = async (req) => {
   let { email, code } = req.body;
 
-  let collection = await OTPS();
+  let db = req.db;
+  let collection = await db.folder("OTPS:general");
   let otp = await collection.findOne({ id: email });
 
   if (!otp) {
@@ -209,24 +191,26 @@ const verify_platform = async (req) => {
     };
   }
 
-  let Pending = await PENDING_USERS();
+  let Pending = await db.folder("Pending_users");
   let platform = await Pending.findOne({ email });
 
   let pass = platform.password;
   delete platform.password;
 
-  await (await USERS()).insertOne(platform);
+  await (await db.folder("Users")).insertOne(platform);
   let platform_profile = {
     ...platform,
     profile: Platform_profile_type_id,
     platform: "usr_profile_001",
   };
   delete platform_profile.uri;
-  await (await PROFILES()).insertOne(platform_profile);
-  await (await PASSWORDS()).insertOne({ _id: platform._id, key: pass });
+  await (await db.folder("profiles")).insertOne(platform_profile);
+  await (
+    await db.folder("Passwords")
+  ).insertOne({ _id: platform._id, key: pass });
 
   await (
-    await TOKENS()
+    await db.folder("Tokens")
   ).insertOne({
     _id: crypto.randomUUID(),
     user: platform._id,
@@ -245,7 +229,10 @@ const verify_platform = async (req) => {
         },
       },
     },
-    await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
+    await (
+      await db.folder("profiles")
+    ).findOne({ _id: process.env.PROFILE_ID }),
+    req,
   );
 
   return {
@@ -257,8 +244,9 @@ const verify_platform = async (req) => {
 
 const resend_verification_otp = async (req) => {
   let { email } = req.body;
+  let db = req.db;
 
-  let Pending = await PENDING_USERS();
+  let Pending = await db.folder("Pending_users");
   let platform = await Pending.findOne({ email });
 
   if (!platform) {
@@ -268,7 +256,7 @@ const resend_verification_otp = async (req) => {
     };
   }
 
-  const otp = await generate_otp(email);
+  const otp = await generate_otp(email, null, { req });
 
   const mail_res = await send_mail(
     {
@@ -286,7 +274,10 @@ const resend_verification_otp = async (req) => {
         },
       },
     },
-    await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
+    await (
+      await db.folder("profiles")
+    ).findOne({ _id: process.env.PROFILE_ID }),
+    req,
   );
 
   return {
@@ -299,8 +290,9 @@ const resend_verification_otp = async (req) => {
 
 const forgot_password = async (req) => {
   let { email } = req.body;
+  let db = req.db;
 
-  let user = await (await USERS()).findOne({ email });
+  let user = await (await db.folder("Users")).findOne({ email });
 
   if (!user) {
     return {
@@ -309,7 +301,7 @@ const forgot_password = async (req) => {
     };
   }
 
-  const otp = await generate_otp(email);
+  const otp = await generate_otp(email, null, { req });
 
   const mail_res = await send_mail(
     {
@@ -327,7 +319,10 @@ const forgot_password = async (req) => {
         },
       },
     },
-    await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
+    await (
+      await db.folder("profiles")
+    ).findOne({ _id: process.env.PROFILE_ID }),
+    req,
   );
 
   return {
@@ -340,8 +335,9 @@ const forgot_password = async (req) => {
 
 const verify_forgot_password_otp = async (req) => {
   let { email, code, new_password } = req.body;
+  let db = req.db;
 
-  let collection = await OTPS();
+  let collection = await db.folder("OTPS:general");
   let otp = await collection.findOne({ id: email });
 
   if (!otp) {
@@ -365,7 +361,7 @@ const verify_forgot_password_otp = async (req) => {
     };
   }
 
-  let user = await (await USERS()).findOne({ email });
+  let user = await (await db.folder("Users")).findOne({ email });
 
   if (!user) {
     return {
@@ -377,7 +373,7 @@ const verify_forgot_password_otp = async (req) => {
   const hashedPassword = hash(new_password);
 
   await (
-    await PASSWORDS()
+    await db.folder("Passwords")
   ).updateOne({ _id: user._id }, { $set: { key: hashedPassword } });
 
   await send_mail(
@@ -392,7 +388,10 @@ const verify_forgot_password_otp = async (req) => {
         },
       },
     },
-    await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
+    await (
+      await db.folder("profiles")
+    ).findOne({ _id: process.env.PROFILE_ID }),
+    req,
   );
 
   return {
@@ -403,8 +402,9 @@ const verify_forgot_password_otp = async (req) => {
 
 const login_platform = async (req) => {
   let { email, password } = req.body;
+  let db = req.db;
 
-  let user = await (await USERS()).findOne({ email });
+  let user = await (await db.folder("Users")).findOne({ email });
 
   if (!user) {
     return {
@@ -413,7 +413,7 @@ const login_platform = async (req) => {
     };
   }
 
-  let pass = await (await PASSWORDS()).findOne({ _id: user._id });
+  let pass = await (await db.folder("Passwords")).findOne({ _id: user._id });
 
   if (pass.key !== hash(password)) {
     return {
@@ -422,16 +422,15 @@ const login_platform = async (req) => {
     };
   }
 
-  let setting = await retrieve_setting(user);
+  let setting = await retrieve_setting(user, null, { req });
 
   let two_fa_setting = setting?.two_factor_auth;
   if (two_fa_setting?.enabled) {
     // Generate OTP
-    const otp = await generate_otp(
-      email,
-      "two_factor_auth",
-      two_fa_setting?.otp,
-    );
+    const otp = await generate_otp(email, "two_factor_auth", {
+      ...two_fa_setting?.otp,
+      req,
+    });
 
     // Send mail
     let response = await send_mail(
@@ -450,7 +449,10 @@ const login_platform = async (req) => {
           },
         },
       },
-      await (await PROFILES()).findOne({ _id: process.env.PROFILE_ID }),
+      await (
+        await db.folder("profiles")
+      ).findOne({ _id: process.env.PROFILE_ID }),
+      req,
     );
 
     return {
@@ -468,7 +470,7 @@ const login_platform = async (req) => {
     created: new Date(),
     token: crypto.randomBytes(32).toString("hex"),
   };
-  await (await SESSIONS()).insertOne(session_token);
+  await (await db.folder("Sessions")).insertOne(session_token);
 
   return {
     ok: true,
@@ -480,8 +482,9 @@ const login_platform = async (req) => {
 
 const retrieve_api_key = async (req) => {
   let user = req.headers.profile;
+  let db = req.db;
 
-  let token = await (await TOKENS()).findOne({ user: user._id });
+  let token = await (await db.folder("Tokens")).findOne({ user: user._id });
 
   if (!token) {
     token = {
@@ -490,7 +493,7 @@ const retrieve_api_key = async (req) => {
       token: crypto.randomBytes(32).toString("hex"),
     };
 
-    await (await TOKENS()).insertOne(token);
+    await (await db.folder("Tokens")).insertOne(token);
   }
 
   ({
@@ -502,8 +505,9 @@ const retrieve_api_key = async (req) => {
 
 const two_factor_auth = async (req) => {
   let { email, code } = req.body;
+  let db = req.db;
 
-  let collection = await OTPS();
+  let collection = await db.folder("OTPS:general");
   let otp = await collection.findOne({ id: email });
 
   if (!otp) {
@@ -527,7 +531,7 @@ const two_factor_auth = async (req) => {
     };
   }
 
-  let user = await (await USERS()).findOne({ email });
+  let user = await (await db.folder("Users")).findOne({ email });
 
   if (!user) {
     return {
@@ -545,8 +549,9 @@ const two_factor_auth = async (req) => {
 
 const platform_by_uri = async (req) => {
   let { uri } = await req.body;
+  let db = req.db;
 
-  let plat = await (await USERS()).findOne({ uri });
+  let plat = await (await db.folder("Users")).findOne({ uri });
 
   return {
     ok: true,

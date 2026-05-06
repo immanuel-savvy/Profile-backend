@@ -1,89 +1,38 @@
-import {
-  OTPS,
-  PASSWORDS,
-  PENDING_PROFILES,
-  PROFILES,
-  RESET_TOKENS,
-  SESSIONS,
-  USERS,
-} from "../../ds/folders.js";
 import { hash } from "../../utils/hash.js";
 import crypto from "crypto";
 import { generate_otp, OTP_expiry, send_mail } from "./platform.js";
-import { email_service, settings_service } from "../../services/email.js";
 
-const get_platform_profile = async (platform) => {
-  let profile = await (await PROFILES()).findOne({ _id: platform._id });
+const get_platform_profile = async (platform, req) => {
+  let profile = await (
+    await req.db.folder("profiles")
+  ).findOne({ _id: platform._id });
 
   return profile;
 };
 
-const service_auth = async (profile, uri) => {
-  if (!profile?.platform) profile = await get_platform_profile(profile);
+const retrieve_setting = async (profile, body, opts = {}) => {
+  let { req } = opts;
 
-  let platform = await (await USERS()).findOne({ uri });
+  let response = await req
+    .services("settings")
+    .call("get_setting", body, { profile });
 
-  let sess = await (
-    await SESSIONS()
-  ).findOne({
-    platform: platform._id,
-    platform_profile: profile._id,
-    third_party_platform: profile.platform,
-  });
-
-  return sess?.token;
+  return response?.ok ? response.data : null;
 };
-
-const retrieve_setting = async (profile, body) => {
-  let auth = await service_auth(profile, "settings.savvyaisolution.com");
-  if (!auth) return;
-
-  try {
-    let response = await fetch(`${settings_service}/get_setting`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "x-api-version": "v1",
-        "x-platform": `profile.savvyaisolution.com`,
-        Authorization: `Bearer ${auth}`,
-      },
-      body: JSON.stringify(body || {}),
-    });
-
-    response = await response.json();
-
-    console.log(response, "HIII");
-    return response?.ok ? response?.data : undefined;
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-export { service_auth };
 
 const send_message = async (
   { phone, content, category, template },
   profile,
+  req,
 ) => {
-  let auth = await service_auth(profile, "aimail.savvyaisolution.com");
-
-  if (!auth) return;
-
   try {
-    let response = await fetch(`${email_service}/send_message`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Accept: "application/json",
-        "x-api-version": "v2",
-        "x-platform": `profile.savvyaisolution.com`,
-        Authorization: `Bearer ${auth}`,
-      },
-      body: JSON.stringify({ phone, category, content, template }),
-    });
-
-    response = await response.json();
+    let response = await req
+      .services("aimail")
+      .call(
+        "send_message",
+        { phone, category, content, template },
+        { profile },
+      );
 
     return response;
   } catch (err) {
@@ -91,8 +40,12 @@ const send_message = async (
   }
 };
 
-const create_profile = async ({ platform, details, type }) => {
-  let setting = await retrieve_setting(platform);
+const create_profile = async ({ platform, details, type }, req) => {
+  let setting = await retrieve_setting(
+    platform,
+    { category: ["identity", "verification"] },
+    { req },
+  );
 
   let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
@@ -115,7 +68,9 @@ const create_profile = async ({ platform, details, type }) => {
 
   query.profile = type;
 
-  const Profiles = await PROFILES();
+  let db = req.db;
+
+  const Profiles = await db.folder("profiles");
 
   // 🚨 Check existing
   const exist = conditions.length ? await Profiles.findOne(query) : null;
@@ -127,7 +82,7 @@ const create_profile = async ({ platform, details, type }) => {
     };
   }
 
-  let Pending = await PENDING_PROFILES();
+  let Pending = await db.folder("pending-profiles");
 
   // 🔑 Build filter
   let filter = {};
@@ -188,7 +143,8 @@ const create_profile = async ({ platform, details, type }) => {
           },
         },
       },
-      await get_platform_profile(platform),
+      await get_platform_profile(platform, req),
+      req,
     );
   }
 
@@ -206,6 +162,7 @@ const create_profile = async ({ platform, details, type }) => {
         },
       },
       await get_platform_profile(platform),
+      req,
     );
   }
 
@@ -220,11 +177,14 @@ const add_profile = async (req) => {
   const platform = req.headers.platform;
   const { details, profile: type } = req.body;
 
-  const response = await create_profile({
-    platform,
-    details,
-    type,
-  });
+  const response = await create_profile(
+    {
+      platform,
+      details,
+      type,
+    },
+    req,
+  );
 
   return response;
 };
@@ -232,8 +192,9 @@ const add_profile = async (req) => {
 const verify_profile = async (req) => {
   let platform = req.headers.platform;
   let { code, email, phone, profile } = req.body;
+  let db = req.db;
 
-  let Otps = await OTPS(profile);
+  let Otps = await db.folder(`OTPS:${profile}`);
 
   // 🔍 Find OTP
   let identifiers = [email, phone].filter(Boolean);
@@ -274,9 +235,9 @@ const verify_profile = async (req) => {
     };
   }
 
-  let Pending = await PENDING_PROFILES();
-  let Profiles = await PROFILES();
-  let Passwords = await PASSWORDS();
+  let Pending = await db.folder("pending-profiles");
+  let Profiles = await db.folder("profiles");
+  let Passwords = await db.folder("Passwords");
 
   let pendingProfile = await Pending.findOne({
     profile,
@@ -349,7 +310,8 @@ const verify_profile = async (req) => {
           },
         },
       },
-      await get_platform_profile(platform),
+      await get_platform_profile(platform, req),
+      req,
     );
 
   return {
@@ -359,13 +321,17 @@ const verify_profile = async (req) => {
   };
 };
 
-const signin_user = async ({
-  platform,
-  body,
-  platform_profile,
-  third_party_platform,
-}) => {
-  let setting = await retrieve_setting(platform);
+const signin_user = async (
+  { platform, body, platform_profile, third_party_platform },
+  req,
+) => {
+  let db = req.db;
+
+  let setting = await retrieve_setting(
+    platform,
+    { category: ["identity", "two_factor_auth"] },
+    { req },
+  );
 
   let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
@@ -385,7 +351,7 @@ const signin_user = async ({
 
   query.profile = body.profile;
 
-  const Profiles = await PROFILES();
+  const Profiles = await db.folder("profiles");
 
   const user = await Profiles.findOne(query);
 
@@ -393,7 +359,7 @@ const signin_user = async ({
     return { ok: false, message: "Invalid credentials" };
   }
 
-  let pass = await (await PASSWORDS()).findOne({ _id: user._id });
+  let pass = await (await db.folder("Passwords")).findOne({ _id: user._id });
 
   if (!pass) {
     return { ok: false, message: "Password not set" };
@@ -406,18 +372,21 @@ const signin_user = async ({
   }
 
   // 🔐 Check 2FA
-  let profile_setting = await retrieve_setting(user);
+  let profile_setting = await retrieve_setting(
+    user,
+    { category: ["two_factor_auth"] },
+    { req },
+  );
 
   const requires2FA = profile_setting?.two_factor_auth;
 
   if (setting?.two_factor_auth?.force_enable || requires2FA?.enabled) {
     const identifiers = [user.email, user.phone].filter(Boolean);
 
-    const otp = await generate_otp(
-      identifiers,
-      body.profile,
-      setting.two_factor_auth.otp,
-    );
+    const otp = await generate_otp(identifiers, body.profile, {
+      ...setting.two_factor_auth.otp,
+      req,
+    });
 
     let template = setting?.two_factor_auth?.template || "two_factor_auth_otp";
 
@@ -441,7 +410,8 @@ const signin_user = async ({
             },
           },
         },
-        await get_platform_profile(platform),
+        await get_platform_profile(platform, req),
+        req,
       );
     }
 
@@ -460,7 +430,8 @@ const signin_user = async ({
             },
           },
         },
-        platform,
+        await get_platform_profile(platform, req),
+        req,
       );
     }
 
@@ -475,7 +446,7 @@ const signin_user = async ({
   // 🔐 Create session
   const token = crypto.randomBytes(32).toString("hex");
 
-  const Sessions = await SESSIONS();
+  const Sessions = await db.folder("Sessions");
 
   let sess = {
     _id: crypto.randomUUID(),
@@ -502,7 +473,7 @@ const signin = async (req) => {
   const platform = req.headers.platform;
   const body = req.body;
 
-  const response = await signin_user({ platform, body });
+  const response = await signin_user({ platform, body }, req);
 
   return response;
 };
@@ -510,8 +481,9 @@ const signin = async (req) => {
 const profile_two_factor_auth = async (req) => {
   let platform = req.headers.platform;
   let { email, phone, code, profile } = req.body;
+  let db = req.db;
 
-  let collection = await OTPS(profile);
+  let collection = await db.folder(`OTPS:${profile}`);
 
   let identifiers = [email, phone].filter(Boolean);
 
@@ -543,7 +515,11 @@ const profile_two_factor_auth = async (req) => {
   }
 
   // 🔑 Rebuild user lookup using uids
-  let setting = await retrieve_setting(platform);
+  let setting = await retrieve_setting(
+    platform,
+    { category: ["identity"] },
+    { req },
+  );
 
   let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
@@ -558,7 +534,7 @@ const profile_two_factor_auth = async (req) => {
 
   query.profile = profile;
 
-  let user = await (await PROFILES()).findOne(query);
+  let user = await (await db.folder("profiles")).findOne(query);
 
   if (!user) {
     return {
@@ -568,9 +544,9 @@ const profile_two_factor_auth = async (req) => {
   }
 
   // 🔐 Generate session token
-  const token = generate_token();
+  const token = crypto.randomBytes(32).toString("hex");
 
-  const Sessions = await SESSIONS();
+  const Sessions = await db.folder("Sessions");
 
   await Sessions.insertOne({
     _id: crypto.randomUUID(),
@@ -595,9 +571,24 @@ const profile_two_factor_auth = async (req) => {
 const resend_profile_otp = async (req) => {
   let platform = req.headers.platform;
   let { email, phone, profile, kind } = req.body;
-  kind = kind || "vrf";
 
-  let setting = await retrieve_setting(platform);
+  kind = kind || "vrf";
+  let setting_key =
+    kind === "upd"
+      ? "update_verification"
+      : kind === "2fa"
+        ? "two_factor_auth"
+        : kind === "psk"
+          ? "forgot_password"
+          : "verification";
+
+  let db = req.db;
+
+  let setting = await retrieve_setting(
+    platform,
+    { category: ["identity", setting_key] },
+    { req },
+  );
 
   let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
@@ -620,9 +611,11 @@ const resend_profile_otp = async (req) => {
 
   query.profile = profile;
 
-  let user = await (await PROFILES()).findOne(query);
+  let user = await (await db.folder("profiles")).findOne(query);
   if (!user && kind === "vrf") {
-    user = await (await PENDING_PROFILES()).findOne({ email, profile });
+    user = await (
+      await db.folder("pending-profiles")
+    ).findOne({ email, profile });
   }
 
   if (!user) {
@@ -632,21 +625,12 @@ const resend_profile_otp = async (req) => {
     };
   }
 
-  let conf =
-    setting?.[
-      kind === "upd"
-        ? "update_verification"
-        : kind === "2fa"
-          ? "two_factor_auth"
-          : kind === "psk"
-            ? "forgot_password"
-            : "verification"
-    ] || {};
+  let conf = setting?.[setting_key] || {};
 
   if (conf?.mode === "link") {
     const resetToken = crypto.randomBytes(32).toString("hex");
     await (
-      await RESET_TOKENS()
+      await db.folder("reset_tokens")
     ).insertOne({
       _id: crypto.randomUUID(),
       user: user._id,
@@ -678,7 +662,8 @@ const resend_profile_otp = async (req) => {
             },
           },
         },
-        await get_platform_profile(platform),
+        await get_platform_profile(platform, req),
+        req,
       );
     }
 
@@ -698,20 +683,19 @@ const resend_profile_otp = async (req) => {
             },
           },
         },
-        await get_platform_profile(platform),
+        await get_platform_profile(platform, req),
+        req,
       );
     }
   } else {
     let otp;
 
-    otp = await generate_otp(
-      [user.email, user.phone],
-      profile,
-      conf.otp || {
-        expiry: OTP_expiry,
-        length: 6,
-      },
-    );
+    otp = await generate_otp([user.email, user.phone], profile, {
+      expiry: OTP_expiry,
+      length: 6,
+      ...conf.otp,
+      req,
+    });
 
     let template =
       (typeof conf.template === "string"
@@ -734,7 +718,8 @@ const resend_profile_otp = async (req) => {
             },
           },
         },
-        await get_platform_profile(platform),
+        await get_platform_profile(platform, req),
+        req,
       );
     }
 
@@ -751,7 +736,8 @@ const resend_profile_otp = async (req) => {
             otp: { code: otp, expiry: conf?.otp?.expiry || OTP_expiry },
           },
         },
-        await get_platform_profile(platform),
+        await get_platform_profile(platform, req),
+        req,
       );
     }
   }
@@ -766,8 +752,13 @@ const resend_profile_otp = async (req) => {
 const profile_forgot_password = async (req) => {
   let platform = req.headers.platform;
   let { email, phone, profile } = req.body;
+  let db = req.db;
 
-  let setting = await retrieve_setting(platform);
+  let setting = await retrieve_setting(
+    platform,
+    { category: ["identity"] },
+    { req },
+  );
 
   let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
@@ -790,7 +781,7 @@ const profile_forgot_password = async (req) => {
 
   query.profile = profile;
 
-  let user = await (await PROFILES()).findOne(query);
+  let user = await (await db.folder("profiles")).findOne(query);
 
   if (!user) {
     return {
@@ -799,14 +790,18 @@ const profile_forgot_password = async (req) => {
     };
   }
 
-  let settings = await retrieve_setting(platform);
+  let settings = await retrieve_setting(
+    platform,
+    { category: ["forgot_password"] },
+    { req },
+  );
   let reset_password_setting = settings?.forgot_password;
 
   if (reset_password_setting?.mode === "link") {
     // 🔐 Generate reset token
     const resetToken = crypto.randomBytes(32).toString("hex");
     await (
-      await RESET_TOKENS()
+      await db.folder("reset_tokens")
     ).insertOne({
       _id: crypto.randomUUID(),
       user: user._id,
@@ -840,6 +835,7 @@ const profile_forgot_password = async (req) => {
           },
         },
         await get_platform_profile(platform),
+        req,
       );
     }
 
@@ -859,7 +855,8 @@ const profile_forgot_password = async (req) => {
             },
           },
         },
-        await get_platform_profile(platform),
+        await get_platform_profile(platform, req),
+        req,
       );
     }
 
@@ -876,6 +873,7 @@ const profile_forgot_password = async (req) => {
     const otp = await generate_otp([user.email, user.phone], profile, {
       expiry: reset_password_setting?.otp?.expiry || OTP_expiry,
       length: reset_password_setting?.otp?.length,
+      req,
     });
 
     let template =
@@ -900,7 +898,8 @@ const profile_forgot_password = async (req) => {
             },
           },
         },
-        await get_platform_profile(platform),
+        await get_platform_profile(platform, req),
+        req,
       );
     }
 
@@ -920,7 +919,8 @@ const profile_forgot_password = async (req) => {
             },
           },
         },
-        await get_platform_profile(platform),
+        await get_platform_profile(platform, req),
+        req,
       );
     }
 
@@ -935,14 +935,14 @@ const profile_forgot_password = async (req) => {
 const profile_verify_forgot_password = async (req) => {
   let platform = req.headers.platform;
   let { email, phone, code, token, profile, new_password } = req.body;
-
+  let db = req.db;
   /**
    * =========================
    * TOKEN RESET FLOW
    * =========================
    */
   if (token) {
-    let rest = await (await RESET_TOKENS()).findOne({ token });
+    let rest = await (await db.folder("reset_tokens")).findOne({ token });
     if (!rest) {
       return {
         ok: false,
@@ -961,14 +961,14 @@ const profile_verify_forgot_password = async (req) => {
     }
 
     await (
-      await PASSWORDS()
+      await db.folder("Passwords")
     ).updateOne(
       { _id: rest.user },
       { $set: { key: hash(new_password), updated: new Date() } },
       { upsert: true },
     );
 
-    let prof = await (await PROFILES()).findOne({ _id: rest.user });
+    let prof = await (await db.folder("profiles")).findOne({ _id: rest.user });
 
     if (prof?.email)
       await send_mail(
@@ -985,7 +985,8 @@ const profile_verify_forgot_password = async (req) => {
             },
           },
         },
-        await get_platform_profile(platform),
+        await get_platform_profile(platform, req),
+        req,
       );
 
     return {
@@ -1000,7 +1001,7 @@ const profile_verify_forgot_password = async (req) => {
    * =========================
    */
 
-  let collection = await OTPS(profile);
+  let collection = await db.folder(`OTPS:${profile}`);
   let identifiers = [email, phone].filter(Boolean);
 
   let otp = await collection.findOne({
@@ -1034,7 +1035,11 @@ const profile_verify_forgot_password = async (req) => {
    * =========================
    */
 
-  let setting = await retrieve_setting(platform);
+  let setting = await retrieve_setting(
+    platform,
+    { category: ["identity"] },
+    { req },
+  );
 
   let uids = setting?.identity?.unique_ids || {
     properties: ["email"],
@@ -1050,7 +1055,7 @@ const profile_verify_forgot_password = async (req) => {
   query.platform = platform._id;
   query.profile = profile;
 
-  let user = await (await PROFILES()).findOne(query);
+  let user = await (await db.folder("profiles")).findOne(query);
 
   if (!user) {
     return {
@@ -1068,7 +1073,7 @@ const profile_verify_forgot_password = async (req) => {
   const newHash = hash(new_password);
 
   await (
-    await PASSWORDS()
+    await db.folder("Passwords")
   ).updateOne(
     { _id: user._id },
     {
@@ -1109,7 +1114,8 @@ const profile_verify_forgot_password = async (req) => {
           },
         },
       },
-      await get_platform_profile(platform),
+      await get_platform_profile(platform, req),
+      req,
     );
   }
 
@@ -1123,6 +1129,7 @@ const update_profile = async (req) => {
   let platform = req.headers.platform;
   let profile_data = req.headers.profile;
   let { updates } = req.body;
+  let db = req.db;
 
   let profile = profile_data?._id;
 
@@ -1133,7 +1140,7 @@ const update_profile = async (req) => {
     };
   }
 
-  let Profiles = await PROFILES();
+  let Profiles = await db.folder("profiles");
 
   if (!profile_data) {
     return {
@@ -1142,10 +1149,14 @@ const update_profile = async (req) => {
     };
   }
 
-  let settings = await retrieve_setting(platform, {
-    category: "identity",
-    value: "unique_ids",
-  });
+  let settings = await retrieve_setting(
+    platform,
+    {
+      category: ["identity"],
+      value: ["unique_ids"],
+    },
+    { req },
+  );
 
   let uids = settings?.identity?.unique_ids || {
     properties: ["email"],
@@ -1185,6 +1196,7 @@ const update_profile = async (req) => {
 const update_profile_unique = async (req) => {
   let { platform, profile: profile_data } = req.headers;
   let { unique, value } = req.body;
+  let db = req.db;
 
   if (!profile_data) {
     return {
@@ -1193,9 +1205,13 @@ const update_profile_unique = async (req) => {
     };
   }
 
-  let settings = await retrieve_setting(platform, {
-    category: "update_verification",
-  });
+  let settings = await retrieve_setting(
+    platform,
+    {
+      category: "update_verification",
+    },
+    { req },
+  );
 
   let otp = await generate_otp(
     [profile_data._id],
@@ -1204,6 +1220,7 @@ const update_profile_unique = async (req) => {
       expiry: OTP_expiry,
       length: 6,
       meta: { type: "update_unique", field: unique, value },
+      req,
     },
   );
 
@@ -1225,7 +1242,8 @@ const update_profile_unique = async (req) => {
           },
         },
       },
-      await get_platform_profile(platform),
+      await get_platform_profile(platform, req),
+      req,
     );
 
     ({
@@ -1247,7 +1265,8 @@ const update_profile_unique = async (req) => {
           },
         },
       },
-      await get_platform_profile(platform),
+      await get_platform_profile(platform, req),
+      req,
     );
 
     ({
@@ -1266,8 +1285,9 @@ const validate_update_profile_unique = async (req) => {
   let { profile: profile_data } = req.headers;
   let { code } = req.body;
   let profile = profile_data?._id;
+  let db = req.db;
 
-  let Profiles = await PROFILES();
+  let Profiles = await db.folder("profiles");
 
   if (!profile_data) {
     return {
@@ -1276,7 +1296,7 @@ const validate_update_profile_unique = async (req) => {
     };
   }
 
-  let collection = await OTPS(profile_data.profile);
+  let collection = await db.folder(`OTPS:${profile_data.profile}`);
   let otp = await collection.findOne({
     id: { $in: [profile_data._id] },
   });
