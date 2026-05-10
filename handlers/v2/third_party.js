@@ -1,4 +1,4 @@
-import { retrieve_setting, signin_user } from "./profiles.js";
+import { create_profile, retrieve_setting, signin_user } from "./profiles.js";
 import crypto, { createHash, randomBytes, createCipheriv } from "crypto";
 
 const deriveKey = (secret) =>
@@ -100,246 +100,144 @@ const get_token = async (req) => {
 };
 
 const third_party_signin = async (req) => {
-  let { platform, profile } = req.headers;
-
-  let { details: body, platform_profile } = req.body;
-
-  console.log(platform, profile, platform_profile);
+  let platform = req.headers.platform;
+  let profile = req.headers.profile;
   let db = req.db;
+  let { third_party_reference, profile_type, credentials } = req.body;
 
-  let result = await signin_user(
+  if (!profile) {
+    return {
+      ok: false,
+      message: "Profile header required",
+    };
+  }
+
+  let third_party_profile = await (
+    await db.folder("Third_parties")
+  ).findOne({ _id: third_party_reference });
+
+  let third_party_platform = await (
+    await db.folder("Users")
+  ).findOne({ _id: third_party_profile.uri });
+
+  let res = await signin_user(
     {
-      platform: await (
-        await db.folder("Users")
-      ).findOne({ _id: profile.platform }),
-      body: { ...body, profile: profile.profile },
-      platform_profile,
+      platform: third_party_platform,
       third_party_platform: platform,
+      body: {
+        ...credentials,
+        profile: profile_type,
+      },
     },
-    req,
+    { db },
   );
 
-  return result;
+  return res;
 };
 
-const third_party_auth = async (req) => {
+const signin_with = async (req) => {
   let platform = req.headers.platform;
-  let authorization = req.headers.authorization;
-  let xplatform = req.headers["x-platform"];
-
-  if (!authorization) {
-    return {
-      ok: false,
-      message: "Authorization token required",
-    };
-  }
   let db = req.db;
+  let { third_party_profile, profile_type, deviceid } = req.body;
 
-  authorization = authorization.replace("Bearer ", "");
+  let profile = await (
+    await db.folder("profiles")
+  ).findOne({ _id: third_party_profile });
 
-  const Sessions = await db.folder("Sessions");
-
-  let xplatform_user = await (
-    await db.folder("Users")
-  ).findOne({ uri: xplatform });
-
-  if (!xplatform_user) {
+  if (!profile) {
     return {
       ok: false,
-      message: "Invalid x-platform header",
+      message: "Third party profile not found",
     };
   }
 
-  // console.log(xplatform_user, "xplatform user");
-  // console.log(platform, "platform header");
-  // console.log(authorization);
-
-  let session = await Sessions.findOne({
-    platform: platform._id,
-    token: authorization,
-    third_party_platform: xplatform_user._id,
-  });
-
-  if (!session) {
-    return {
-      ok: false,
-      message: "Invalid authorization token",
-    };
-  }
-
-  // ⏳ Check expiration
-  if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
-    // 🧹 Optional cleanup
-    await Sessions.deleteOne({ _id: session._id });
-
-    return {
-      ok: false,
-      message: "Session expired",
-      code: "SESSION_EXPIRED",
-    };
-  }
-
-  // ✅ Attach session + user to request
-
-  let user = await (
+  let my_profile = await (
     await db.folder("profiles")
   ).findOne({
-    _id: session.user,
+    email: profile.email,
+    platform: platform._id,
+    profile: profile_type,
   });
 
-  return {
-    ok: true,
-    message: "Authentication successful",
-    data: {
-      profile: user,
-      platform,
-      third_party_platform: xplatform_user,
-    },
-  };
-};
-
-const signup_with = async (req) => {
-  let {
-    xplatform: xplatform_uri,
-    platform,
-    authorization,
-    profile,
-  } = req.headers;
-  let { permissions, profile_type } = req.body;
-  let db = req.db;
-
-  let xplatform = await (
-    await db.folder("Users")
-  ).findOne({ uri: xplatform_uri });
-
-  let setting = await retrieve_setting(
-    platform,
-    {
-      category: ["webhooks", "identity", "profile_schema"],
-    },
-    { req },
-  );
-
-  let { profile_schema, identity, webhooks } = setting || {};
-  if (!identity) {
-    identity = {
-      unique_ids: { properties: ["email"], query: "and" },
+  if (!my_profile) {
+    return {
+      ok: false,
+      message: "No matching profile found for this third party profile",
     };
   }
-
-  let xprofile = {};
-
-  if (identity) {
-    let unids = identity.unique_ids;
-    if (unids.query === "and") {
-      for (let i = 0; i < unids.properties.length; i++) {
-        let property = unids.properties[i];
-        if (!profile[property]) {
-          return {
-            ok: false,
-            message: "Incomplete profile data",
-          };
-        }
-        xprofile[property] = profile[property];
-      }
-    } else if (unids.query === "or") {
-      let uid = {};
-      for (let i = 0; i < unids.properties.length; i++) {
-        let property = unids.properties[i];
-
-        if (profile[property]) uid[property] = profile[property];
-      }
-      if (!Object.keys(uid).length)
-        return {
-          ok: false,
-          message: "Incomplete profile data",
-        };
-      xprofile = { ...xprofile, ...uid };
-    }
-  }
-
-  let Profiles = await db.folder("profiles");
-  if (Object.keys(xprofile).length) {
-    let exists = await Profiles.findOne({
-      $or: xprofile,
-      profile: profile_type,
-    });
-    if (exists) {
-      return {
-        ok: false,
-        message: "Profile with provided unique fields already exists",
-      };
-    }
-  }
-
-  for (let prop in profile_schema) {
-    let val = profile_schema[prop];
-
-    let profile_val = profile[prop];
-    if (val.required && !profile_val) {
-      return {
-        ok: false,
-        message: "Incomplete profile schema",
-      };
-    }
-    if (val.validation) {
-      if (String(profile[prop]).match(val.validation)) {
-        return {
-          ok: false,
-          message: "Invalid schema match",
-        };
-      }
-    }
-    xprofile[prop] = profile[prop];
-  }
-
-  xprofile.profile = profile_type;
-  xprofile.platform = platform._id;
-
-  xprofile._id = crypto.randomUUID();
-  xprofile.created = new Date();
-  xprofile.verified = xplatform_uri;
-  xprofile.verifiedAt = new Date();
-
-  await Profiles.insertOne(xprofile);
+  // 🔐 Create session
+  const token = crypto.randomBytes(32).toString("hex");
 
   const Sessions = await db.folder("Sessions");
 
   let sess = {
     _id: crypto.randomUUID(),
-    token: crypto.randomBytes(32).toString("hex"),
-    user: xprofile._id,
+    token,
+    user: my_profile._id,
     platform: platform._id,
-    profile: xprofile.profile,
-    platform_profile: null,
+    profile: my_profile.profile,
     created: new Date(),
+    deviceid,
   };
-  let xsess = {
-    _id: crypto.randomUUID(),
-    token: crypto.randomBytes(32).toString("hex"),
-    user: xprofile._id,
-    platform: platform._id,
-    profile: xprofile.profile,
-    platform_profile: profile._id,
-    created: new Date(),
-    third_party_platform: xplatform._id,
-  };
-
-  await Sessions.insertMany([sess, xsess]);
+  await Sessions.insertOne(sess);
 
   return {
     ok: true,
-    message: "Profile created",
-    token: sess.token,
-    data: xprofile,
+    message: "Signin successful",
+    token,
+    data: my_profile,
+  };
+};
+
+const signup_with = async (req) => {
+  let platform = req.headers.platform;
+  let db = req.db;
+  let { third_party_profile, profile_type, deviceid } = req.body;
+
+  let profile = await (
+    await db.folder("profiles")
+  ).findOne({ _id: third_party_profile });
+
+  let my_profile = {
+    fullname: profile.fullname,
+    email: profile.email,
+    firstname: profile.firstname,
+    lastname: profile.lastname,
+    platform: platform._id,
+    profile: profile_type,
+    _id: crypto.randomUUID(),
+  };
+
+  await db.folder("profiles").insertOne(my_profile);
+
+  const token = crypto.randomBytes(32).toString("hex");
+
+  const Sessions = await db.folder("Sessions");
+
+  let sess = {
+    _id: crypto.randomUUID(),
+    token,
+    user: my_profile._id,
+    platform: platform._id,
+    profile: my_profile.profile,
+    created: new Date(),
+    deviceid,
+  };
+  await Sessions.insertOne(sess);
+
+  return {
+    ok: true,
+    message: "Signup successful",
+    token,
+    data: my_profile,
   };
 };
 
 export {
   third_party_signin,
-  third_party_auth,
   get_token,
   signup_with,
+  signin_with,
   encryptToken,
   decryptToken,
 };

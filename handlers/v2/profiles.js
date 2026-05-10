@@ -191,7 +191,7 @@ const add_profile = async (req) => {
 
 const verify_profile = async (req) => {
   let platform = req.headers.platform;
-  let { code, email, phone, profile } = req.body;
+  let { code, email, phone, profile, deviceid } = req.body;
   let db = req.db;
 
   let Otps = await db.folder(`OTPS:${profile}`);
@@ -255,14 +255,14 @@ const verify_profile = async (req) => {
   // 🔐 Extract & hash password
   let rawPassword = pendingProfile.password;
 
-  if (!rawPassword) {
-    return {
-      ok: false,
-      message: "Password not found in pending profile",
-    };
-  }
+  // if (!rawPassword) {
+  //   return {
+  //     ok: false,
+  //     message: "Password not found in pending profile",
+  //   };
+  // }
 
-  const hashed = hash(rawPassword);
+  const hashed = hash(rawPassword || "");
 
   // 🧾 Store password separately
   await Passwords.updateOne(
@@ -314,15 +314,31 @@ const verify_profile = async (req) => {
       req,
     );
 
+  const token = crypto.randomBytes(32).toString("hex");
+
+  const Sessions = await db.folder("Sessions");
+
+  let sess = {
+    _id: crypto.randomUUID(),
+    token,
+    user: finalProfile._id,
+    platform: platform._id,
+    profile: finalProfile.profile,
+    created: new Date(),
+    deviceid,
+  };
+  await Sessions.insertOne(sess);
+
   return {
     ok: true,
     message: "Profile verified successfully",
+    token,
     data: finalProfile,
   };
 };
 
 const signin_user = async (
-  { platform, body, platform_profile, third_party_platform },
+  { platform, body, platform_profile, third_party_platform, deviceid },
   req,
 ) => {
   let db = req.db;
@@ -456,6 +472,7 @@ const signin_user = async (
     profile: user.profile,
     platform_profile,
     created: new Date(),
+    deviceid,
   };
   if (third_party_platform)
     sess.third_party_platform = third_party_platform?._id;

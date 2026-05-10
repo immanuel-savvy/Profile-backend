@@ -29,11 +29,13 @@ import {
 } from "../handlers/v2/profiles.js";
 import {
   get_token,
-  third_party_auth,
+  signin_with,
+  signup_with,
   third_party_signin,
 } from "../handlers/v2/third_party.js";
 import { validate, validate_third_party } from "../handlers/v2/validate.js";
 import { normalise_email } from "../handlers/v2/middlewares/middlewares.js";
+import { get_device_profiles } from "../handlers/v2/devices.js";
 
 let body_norm_email = async (payload) => {
   let res = await normalise_email(payload.body.email);
@@ -369,19 +371,51 @@ const routes = {
   third_party_signin: {
     handler: third_party_signin,
     security: "both",
+    db: "platform",
     schema: {
       details: { required: true, type: "object" },
       platform_profile: { required: true, type: "/add_profile?data._id" },
     },
   },
-  third_party_auth: { handler: third_party_auth, security: "all" },
+  signup_with: {
+    handler: signup_with,
+    security: "both",
+    schema: {
+      third_party_profile: { required: true, type: "/add_profile?data._id" },
+      profile_type: { required: true, type: "/create_profile_type?data._id" },
+      deviceid: { required: true, type: "string" },
+    },
+  },
+  signin_with: {
+    handler: signin_with,
+    security: "both",
+    db: "platform",
+    schema: {
+      third_party_profile: { required: true, type: "/add_profile?data._id" },
+      profile_type: { required: true, type: "/create_profile_type?data._id" },
+      deviceid: { required: true, type: "string" },
+    },
+  },
   get_token: {
     handler: get_token,
     security: "first",
-    no_db: true,
+    db: "platform",
     schema: {
       profile: { required: true, type: "/add_profile?data._id" },
       platform_uri: { required: true, type: "/new_platform?data.uri" },
+    },
+  },
+
+  // Devices
+  get_device_profiles: {
+    handler: get_device_profiles,
+    security: "first",
+    db: "platform",
+    schema: {
+      body: {
+        deviceid: { required: true, type: "string" },
+        profile_type: { required: true, type: "/create_profile_type?data._id" },
+      },
     },
   },
 };
