@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { hash } from "../../utils/hash.js";
 import { retrieve_setting } from "./profiles.js";
+import debug from "../../utils/debug.js";
 
 let Platform_profile_type_id = "platform_profile_type_id"; // profile type id for platforms
 
@@ -15,9 +16,9 @@ const send_mail = async ({ from, to, content }, profile, req) => {
     };
   }
 
-  console.log(req);
+  debug(req);
   let email_service = await req.services("aimail");
-  console.log(email_service, "uhh");
+  debug(email_service, "uhh");
   let response = email_service.call(
     "send_mail",
     {
@@ -85,7 +86,7 @@ const add_platform = async (req) => {
     $or: [{ email }, { name }],
   });
 
-  console.log(exist, req.body, "newplatform bdy");
+  debug(exist, req.body, "newplatform bdy");
   if (exist) {
     let msg;
 
@@ -164,7 +165,7 @@ const add_platform = async (req) => {
 };
 
 const verify_platform = async (req) => {
-  let { email, code } = req.body;
+  let { email, code, profile } = req.body;
 
   let db = req.db;
   let collection = await db.folder("OTPS:general");
@@ -198,16 +199,23 @@ const verify_platform = async (req) => {
   delete platform.password;
 
   await (await db.folder("Users")).insertOne(platform);
-  let platform_profile = {
-    ...platform,
-    profile: Platform_profile_type_id,
-    platform: "usr_profile_001",
-  };
-  delete platform_profile.uri;
-  await (await db.folder("profiles")).insertOne(platform_profile);
+  if (!profile) {
+    let platform_profile = {
+      ...platform,
+      profile: Platform_profile_type_id,
+      platform: "usr_profile_001",
+      // _id: crypto.randomUUID(),
+      created: new Date(),
+    };
+    delete platform_profile.uri;
+    await (await db.folder("profiles")).insertOne(platform_profile);
+  }
   await (
     await db.folder("Passwords")
   ).insertOne({ _id: platform._id, key: pass });
+  // await (
+  //   await db.folder("Passwords")
+  // ).insertOne({ _id: platform_profile._id, key: pass });
 
   await (
     await db.folder("Tokens")
@@ -415,6 +423,12 @@ const login_platform = async (req) => {
 
   let pass = await (await db.folder("Passwords")).findOne({ _id: user._id });
 
+  if (!pass.key) {
+    return {
+      ok: false,
+      message: "Password not set for this platform",
+    };
+  }
   if (pass.key !== hash(password)) {
     return {
       ok: false,

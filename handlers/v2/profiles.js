@@ -1,3 +1,4 @@
+import debug from "../../utils/debug.js";
 import { hash } from "../../utils/hash.js";
 import crypto from "crypto";
 import { generate_otp, OTP_expiry, send_mail } from "./platform.js";
@@ -210,7 +211,7 @@ const verify_profile = async (req) => {
     };
   }
 
-  console.log(otpRecord, code, "UHH");
+  debug(otpRecord, code, "UHH");
   if (otpRecord.code !== code) {
     return {
       ok: false,
@@ -218,7 +219,7 @@ const verify_profile = async (req) => {
     };
   }
 
-  console.log(
+  debug(
     new Date(otpRecord.updatedAt).getTime() + otpRecord.expiry * 1000 * 60,
     "expiry time",
     otpRecord,
@@ -1359,6 +1360,37 @@ const validate_update_profile_unique = async (req) => {
   });
 };
 
+const get_profile = async (req) => {
+  let { profile: profile_id } = req.body;
+  let db = req.db;
+
+  if (!profile_id) {
+    return {
+      ok: false,
+      message: "Profile is not found.",
+    };
+  }
+
+  let profile = await (
+    await db.folder("profiles")
+  ).findOne({
+    _id: profile_id,
+  });
+
+  if (!profile) {
+    return {
+      ok: false,
+      message: "Profile not found.",
+    };
+  }
+
+  return {
+    ok: true,
+    message: "Profile retrieved successfully.",
+    data: profile,
+  };
+};
+
 export {
   add_profile,
   retrieve_setting,
@@ -1373,4 +1405,5 @@ export {
   resend_profile_otp,
   create_profile,
   signin_user,
+  get_profile,
 };

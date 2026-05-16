@@ -17,6 +17,7 @@ import {
 } from "../handlers/v2/profile_types.js";
 import {
   add_profile,
+  get_profile,
   profile_forgot_password,
   profile_two_factor_auth,
   profile_verify_forgot_password,
@@ -203,6 +204,17 @@ const routes = {
   },
 
   // Profile
+  get_profile: {
+    handler: get_profile,
+    security: "first",
+    schema: {
+      body: {
+        profile: {
+          type: "/add_profile?data._id",
+        },
+      },
+    },
+  },
   add_profile: {
     handler: add_profile,
     security: "first",
@@ -371,7 +383,6 @@ const routes = {
   third_party_signin: {
     handler: third_party_signin,
     security: "both",
-    db: "platform",
     schema: {
       details: { required: true, type: "object" },
       platform_profile: { required: true, type: "/add_profile?data._id" },
@@ -379,7 +390,7 @@ const routes = {
   },
   signup_with: {
     handler: signup_with,
-    security: "both",
+    security: "first",
     schema: {
       third_party_profile: { required: true, type: "/add_profile?data._id" },
       profile_type: { required: true, type: "/create_profile_type?data._id" },
@@ -388,8 +399,7 @@ const routes = {
   },
   signin_with: {
     handler: signin_with,
-    security: "both",
-    db: "platform",
+    security: "first",
     schema: {
       third_party_profile: { required: true, type: "/add_profile?data._id" },
       profile_type: { required: true, type: "/create_profile_type?data._id" },
@@ -399,7 +409,6 @@ const routes = {
   get_token: {
     handler: get_token,
     security: "first",
-    db: "platform",
     schema: {
       profile: { required: true, type: "/add_profile?data._id" },
       platform_uri: { required: true, type: "/new_platform?data.uri" },
@@ -410,7 +419,6 @@ const routes = {
   get_device_profiles: {
     handler: get_device_profiles,
     security: "first",
-    db: "platform",
     schema: {
       body: {
         deviceid: { required: true, type: "string" },

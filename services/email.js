@@ -34,7 +34,12 @@ async function createVerification(phone) {
       channel: "sms",
       to: phone,
     });
+
+  console.log(verification);
+  return verification;
 }
+
+export { createVerification };
 
 const send_message_otp = async (phone, { platform, profile_type }) => {
   let settings = await (await SETTINGS()).findOne({ _id: platform });

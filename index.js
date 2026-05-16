@@ -1,5 +1,6 @@
 import handler from "./Profile.js";
 import http from "http";
+import { createVerification } from "./services/email.js";
 
 let server = http.createServer(handler);
 

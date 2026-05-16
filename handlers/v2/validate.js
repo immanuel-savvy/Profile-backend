@@ -1,3 +1,5 @@
+import debug from "../../utils/debug.js";
+
 const validate = async (req) => {
   const headers = req.headers || {};
 
@@ -13,7 +15,7 @@ const validate = async (req) => {
 
   const db = req.db;
 
-  console.log(db, "WHAT IS HERE?");
+  debug(db, "WHAT IS HERE?");
   const Tokens = await db.folder("Tokens");
   const pload = await Tokens.findOne({ token: api_key });
 

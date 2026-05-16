@@ -605,9 +605,23 @@ const update_profile = async (req, res) => {
 
   let result = await Profiles.updateOne({ _id }, { $set: data });
 
-  res.json({
-    ok: !!result.modifiedCount,
-    message: result.modifiedCount ? "Profile updated" : "Profile update failed",
+  if (!result || result.matchedCount === 0) {
+    return res.json({
+      ok: false,
+      message: "Profile not found",
+    });
+  }
+
+  if (result.modifiedCount === 0) {
+    return res.json({
+      ok: true,
+      message: "Profile found but no changes made",
+    });
+  }
+
+  return res.json({
+    ok: true,
+    message: "Profile updated",
   });
 };
 
