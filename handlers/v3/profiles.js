@@ -1,4 +1,4 @@
-import { hash } from "../../utils/hash";
+import { hash } from "../../utils/hash.js";
 
 const get_platform_profile = async (req, platform) => {
   let { db } = req;
