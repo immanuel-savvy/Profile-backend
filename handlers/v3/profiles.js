@@ -71,18 +71,24 @@ const generate_otp = async ({
   return { ok: true, _id: doc._id, identity, otp, expires_at };
 };
 
-const create_session_object = async (profile, platform, req, options) => {
+export const create_session_object = async (
+  profile,
+  platform,
+  req,
+  options,
+) => {
   let { meta_payload, template, third_party, is_refresh } = options || {};
   let Sessions = await req.db.folder("Sessions");
   let obj = {
     _id: crypto.randomUUID(),
     profile: profile._id,
-    platform,
+    platform: platform._id,
+    platform_uri: platform.uri,
     token: crypto.randomBytes(48).toString("hex"),
     created: Date.now(),
   };
   if (third_party) {
-    obj.third_party = third_party.uri;
+    obj.third_party_uri = third_party.uri;
     obj.third_party_profile = third_party.profile;
   }
 

@@ -21,9 +21,95 @@ import {
   update_profile,
   update_profile_identity,
 } from "../handlers/v3/profiles.js";
+import {
+  authorise_third_party,
+  get_token,
+  register_third_party,
+} from "../handlers/v3/third_party.js";
+import { me, third_party_me, validate } from "../handlers/v3/validate.js";
 
 // 🔑 Route map (KV store)
 const routes = {
+  // Third party
+  register_third_party: {
+    handler: register_third_party,
+    security: "first",
+    schema: {
+      body: {
+        uri: {
+          type: "string",
+          required: true,
+        },
+        permissions: {
+          type: "object",
+          required: false,
+        },
+        profile_types: {
+          type: "array",
+          required: true,
+        },
+      },
+    },
+  },
+  authorise_third_party: {
+    handler: authorise_third_party,
+    security: "both",
+    schema: {
+      body: {
+        third_party_token: {
+          required: true,
+          type: "string",
+        },
+        platform_uri: {
+          type: "string",
+          required: true,
+        },
+        session_token: {
+          type: "string",
+          required: true,
+        },
+      },
+    },
+  },
+  get_token: {
+    handler: get_token,
+    security: "first",
+    schema: {
+      body: {
+        profile: {
+          type: "string",
+          required: true,
+        },
+        platform_uri: {
+          type: "string",
+          required: true,
+        },
+      },
+    },
+  },
+
+  // Validate
+  validate: {
+    handler: validate,
+    security: "none",
+  },
+  me: {
+    handler: me,
+    security: "none",
+  },
+  third_party_me: {
+    handler: third_party_me,
+    security: "none",
+    schema: {
+      body: {
+        from: {
+          type: "string",
+          required: true,
+        },
+      },
+    },
+  },
+
   // Platforms
   new_platform: {
     handler: new_platform,

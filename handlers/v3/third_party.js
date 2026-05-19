@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { create_session_object } from "./profiles.js";
 
 /**
  * =========================================================
@@ -21,13 +22,13 @@ const register_third_party = async (req) => {
 
   let { platform } = headers;
 
-  let { uri, permissions = [], platform_id, profile_type } = body;
+  let { uri, permissions = {}, profile_types } = body;
 
-  if (!uri && !platform_id) {
+  if (!uri) {
     return {
       ok: false,
       status: 400,
-      message: "uri or platform_id required",
+      message: "uri required",
     };
   }
 
@@ -41,15 +42,7 @@ const register_third_party = async (req) => {
 
   let existing = await Third_party.findOne({
     owner_platform: platform._id,
-    profile_type: profile_type || null,
-    $or: [
-      uri ? { uri } : null,
-      platform_id
-        ? {
-            third_party_platform: platform_id,
-          }
-        : null,
-    ].filter(Boolean),
+    uri,
   });
 
   if (existing) {
@@ -67,9 +60,7 @@ const register_third_party = async (req) => {
 
     owner_platform: platform._id,
 
-    third_party_platform: platform_id || null,
-
-    profile_type,
+    profile_types,
 
     uri: uri || null,
 
@@ -92,7 +83,7 @@ const register_third_party = async (req) => {
       _id: third_party._id,
 
       api_key,
-      profile_type,
+      profile_types,
 
       permissions,
     },
@@ -123,29 +114,14 @@ const register_third_party = async (req) => {
 const authorise_third_party = async (req) => {
   let { db, headers, body } = req;
 
-  let { platform } = headers;
+  let { platform, profile } = headers;
 
-  let { api_key, secret, auth_token } = body;
-
-  if (!api_key || !secret || !auth_token) {
-    return {
-      ok: false,
-      status: 400,
-      message: "api_key, secret and auth_token required",
-    };
-  }
-
-  /**
-   * =========================================================
-   * VALIDATE THIRD PARTY
-   * =========================================================
-   */
+  let { third_party_token, platform_uri, session_token } = body;
 
   let Third_party = await db.folder("Third_party_platforms");
 
   let integration = await Third_party.findOne({
-    api_key,
-    secret,
+    api_key: third_party_token,
 
     enabled: true,
   });
@@ -154,44 +130,50 @@ const authorise_third_party = async (req) => {
     return {
       ok: false,
       status: 401,
-      message: "Invalid third party credentials",
+      message: "Invalid third party token",
     };
   }
 
-  /**
-   * =========================================================
-   * VALIDATE SESSION
-   * =========================================================
-   */
-
-  let Sessions = await db.folder("sessions");
-
-  let source_session = await Sessions.findOne({
-    token: auth_token,
-    platform: integration.owner_platform,
-  });
-
-  if (!source_session) {
+  if (integration.owner_platform_uri !== platform_uri) {
     return {
       ok: false,
       status: 401,
-      message: "Invalid auth token",
+      message: "Third party token not valid for this platform",
+    };
+  }
+  if (integration.uri !== platform.uri) {
+    return {
+      ok: false,
+      status: 401,
+      message: "Third party token does not belong to this platform",
     };
   }
 
-  /**
-   * =========================================================
-   * PROFILE
-   * =========================================================
-   */
+  let Sessions = await db.folder("sessions");
 
-  let Profiles = await db.folder("profiles");
+  let session = await Sessions.findOne({
+    token: session_token,
 
-  let profile = await Profiles.findOne({
-    _id: source_session.profile,
+    platform_uri,
   });
 
-  if (!profile) {
+  if (!session) {
+    return {
+      ok: false,
+      status: 401,
+      message: "Invalid session token",
+    };
+  }
+
+  // if (session.created )
+
+  let Profiles = await db.folder("Profiles");
+
+  let session_profile = await Profiles.findOne({
+    _id: session.profile,
+  });
+
+  if (!session_profile) {
     return {
       ok: false,
       status: 404,
@@ -199,64 +181,57 @@ const authorise_third_party = async (req) => {
     };
   }
 
-  /**
-   * =========================================================
-   * CREATE SESSION
-   * =========================================================
-   */
+  let Platforms = await db.folder("Platforms");
 
-  let session = {
-    _id: crypto.randomUUID(),
+  let xplatform = await Platforms.findOne({ uri: platform_uri });
 
-    profile: profile._id,
-
-    platform: platform._id,
-
-    parent_platform: integration.owner_platform,
-
-    third_party: true,
-
-    token: crypto.randomBytes(48).toString("hex"),
-
-    created: Date.now(),
-  };
-
-  await Sessions.insertOne(session);
-
-  /**
-   * =========================================================
-   * AUDIT LOG
-   * =========================================================
-   */
-
-  let Third_party_logs = await db.folder("Third_party_logs");
-
-  await Third_party_logs.insertOne({
-    _id: crypto.randomUUID(),
-
-    integration: integration._id,
-
-    profile: profile._id,
-
-    source_platform: integration.owner_platform,
-
-    destination_platform: platform._id,
-
-    session: session._id,
-
-    created: Date.now(),
-  });
+  let response_session = await create_session_object(
+    session_profile,
+    xplatform,
+    req,
+    {
+      third_party: {
+        uri: platform.uri,
+        profile: profile._id,
+      },
+    },
+  );
 
   return {
     ok: true,
-    status: 200,
-    message: "Third party authorisation successful",
+    message: "Authorised",
+    token: response_session.token,
+    data: response_session,
+  };
+};
 
-    data: {
-      token: session.token,
+const get_token = async (req) => {
+  let { headers, db, body } = req;
+  let { platform } = headers;
 
-      profile,
-    },
+  let { profile, platform_uri } = body;
+
+  let Sessions = await db.folder("Sessions");
+
+  let session = await Sessions.findOne({
+    third_party_profile: profile,
+    third_party_uri: platform.uri,
+    platform_uri,
+  });
+
+  if (!session) {
+    return {
+      ok: false,
+      message: "Session not found",
+      status: 400,
+    };
+  }
+
+  return {
+    ok: true,
+    message: "Session valid",
+    token: session.token,
+    data: session,
   };
 };
 
@@ -270,97 +245,11 @@ const refresh_third_party_token = async (req) => {
   let { db, headers, body } = req;
 
   let { platform } = headers;
-
-  let { token, api_key, secret } = body;
-
-  if (!token || !api_key || !secret) {
-    return {
-      ok: false,
-      status: 400,
-      message: "token, api_key and secret required",
-    };
-  }
-
-  /**
-   * =========================================================
-   * VALIDATE INTEGRATION
-   * =========================================================
-   */
-
-  let Third_party = await db.folder("Third_party_platforms");
-
-  let integration = await Third_party.findOne({
-    api_key,
-    secret,
-
-    enabled: true,
-  });
-
-  if (!integration) {
-    return {
-      ok: false,
-      status: 401,
-      message: "Invalid integration credentials",
-    };
-  }
-
-  /**
-   * =========================================================
-   * VALIDATE SESSION
-   * =========================================================
-   */
-
-  let Sessions = await db.folder("sessions");
-
-  let session = await Sessions.findOne({
-    token,
-
-    third_party: true,
-
-    platform: platform._id,
-  });
-
-  if (!session) {
-    return {
-      ok: false,
-      status: 401,
-      message: "Invalid session token",
-    };
-  }
-
-  /**
-   * =========================================================
-   * ROTATE TOKEN
-   * =========================================================
-   */
-
-  let new_token = crypto.randomBytes(48).toString("hex");
-
-  await Sessions.updateOne(
-    {
-      _id: session._id,
-    },
-    {
-      $set: {
-        token: new_token,
-        updated: Date.now(),
-      },
-    },
-  );
-
-  return {
-    ok: true,
-    status: 200,
-    message: "Third party token refreshed",
-
-    data: {
-      token: new_token,
-    },
-  };
 };
 
 export {
   register_third_party,
   authorise_third_party,
   refresh_third_party_token,
+  get_token,
 };
