@@ -23,20 +23,24 @@ let gen_otp = (length = 4) => {
 };
 
 async function createVerification(phone) {
-  const client = twilio(
-    process.env.TWILIO_ACCOUNT_SID,
-    process.env.TWILIO_AUTH_TOKEN,
-  );
+  try {
+    const client = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN,
+    );
 
-  const verification = await client.verify.v2
-    .services(process.env.TWILIO_SERVICE)
-    .verifications.create({
-      channel: "sms",
-      to: phone,
-    });
+    const verification = await client.verify.v2
+      .services(process.env.TWILIO_SERVICE)
+      .verifications.create({
+        channel: "sms",
+        to: phone,
+      });
 
-  console.log(verification);
-  return verification;
+    console.log(verification);
+    return verification;
+  } catch (err) {
+    return;
+  }
 }
 
 export { createVerification };

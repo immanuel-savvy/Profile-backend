@@ -72,7 +72,7 @@ const generate_otp = async ({
 };
 
 const create_session_object = async (profile, platform, req, options) => {
-  let { meta_payload, template, is_refresh } = options || {};
+  let { meta_payload, template, third_party, is_refresh } = options || {};
   let Sessions = await req.db.folder("Sessions");
   let obj = {
     _id: crypto.randomUUID(),
@@ -81,6 +81,10 @@ const create_session_object = async (profile, platform, req, options) => {
     token: crypto.randomBytes(48).toString("hex"),
     created: Date.now(),
   };
+  if (third_party) {
+    obj.third_party = third_party.uri;
+    obj.third_party_profile = third_party.profile;
+  }
 
   await Sessions.insertOne(obj);
 

@@ -136,20 +136,24 @@ const signup = async (req, res) => {
   });
 };
 
-async function checkVerification(code, phone) {
+export async function checkVerification(code, phone) {
   const client = twilio(
     process.env.TWILIO_ACCOUNT_SID,
     process.env.TWILIO_AUTH_TOKEN,
   );
 
-  const verificationCheck = await client.verify.v2
-    .services(process.env.TWILIO_SERVICE)
-    .verificationChecks.create({
-      to: phone,
-      code,
-    });
+  try {
+    const verificationCheck = await client.verify.v2
+      .services(process.env.TWILIO_SERVICE)
+      .verificationChecks.create({
+        to: phone,
+        code,
+      });
 
-  return verificationCheck.status;
+    return verificationCheck.status;
+  } catch (e) {
+    return;
+  }
 }
 
 const verify_forgot_password = async (req, res) => {
