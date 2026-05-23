@@ -393,6 +393,38 @@ const accept_transfer = async (req) => {
   };
 };
 
+const get_platform_token = async (req) => {
+  let { headers, db, body } = req;
+
+  let { profile } = headers;
+  let { uri } = body;
+
+  let platform = await (
+    await db.folder("Platforms")
+  ).findOne({ uri, profile: profile._id });
+
+  if (!platform) {
+    return {
+      ok: false,
+      message: "Platform not found",
+      response_code: "platform_not_found",
+      status: 400,
+    };
+  }
+
+  let token = await (
+    await db.folder("Platform_tokens")
+  ).findOne({ platform: platform._id });
+
+  return {
+    ok: true,
+    message: "Platform Token",
+    response_code: "platform_token",
+    token: token.token,
+    data: platform,
+  };
+};
+
 export {
   new_platform,
   get_platform,
@@ -402,4 +434,5 @@ export {
   transfer_platform,
   accept_transfer,
   delete_transfer,
+  get_platform_token,
 };

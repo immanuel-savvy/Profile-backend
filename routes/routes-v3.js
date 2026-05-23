@@ -2,6 +2,7 @@ import {
   accept_transfer,
   delete_transfer,
   get_platform,
+  get_platform_token,
   get_profile_platforms,
   new_platform,
   transfer_platform,
@@ -304,6 +305,15 @@ const routes = {
           type: "string",
           required: true,
         },
+      },
+    },
+  },
+  get_platform_token: {
+    handler: get_platform_token,
+    security: "auth_token",
+    schema: {
+      body: {
+        uri: { required: true, type: "string" },
       },
     },
   },
