@@ -1,4 +1,5 @@
 import { hash } from "../../utils/hash.js";
+import { get_settings } from "./utils.js";
 
 const get_platform_profile = async (req, platform) => {
   let { db } = req;
@@ -8,6 +9,8 @@ const get_platform_profile = async (req, platform) => {
 
   return res;
 };
+
+export { get_platform_profile };
 
 const generate_otp = async ({
   db,
@@ -77,11 +80,19 @@ export const create_session_object = async (
   req,
   options,
 ) => {
-  let { meta_payload, template, third_party, is_refresh } = options || {};
+  let {
+    meta_payload,
+    session_settings,
+    template,
+    third_party,
+    is_refresh,
+    by,
+  } = options || {};
   let Sessions = await req.db.folder("Sessions");
   let obj = {
     _id: crypto.randomUUID(),
     profile: profile._id,
+    profile_type: profile.profile,
     platform: platform._id,
     platform_uri: platform.uri,
     token: crypto.randomBytes(48).toString("hex"),
@@ -90,6 +101,9 @@ export const create_session_object = async (
   if (third_party) {
     obj.third_party_uri = third_party.uri;
     obj.third_party_profile = third_party.profile;
+  }
+  if (by) {
+    obj.by = by;
   }
 
   await Sessions.insertOne(obj);
@@ -100,15 +114,14 @@ export const create_session_object = async (
 
   // Send signin notification only if email is present.
   if (profile?.email && !is_refresh) {
-    let settings = await req.services("settings").call(
-      "get_settings",
-      { category: [profile.profile], key: ["sessions"] },
-      {
-        profile: await get_platform_profile(req, platform),
-      },
-    );
+    if (!session_settings) {
+      let settings = await get_settings({
+        req,
+        body: { category: [profile.profile], key: ["sessions"] },
+      });
 
-    let session_settings = settings.sessions;
+      session_settings = settings.sessions;
+    }
 
     if (session_settings?.notify?.enabled) {
       await req.services("aimail").call(
@@ -189,13 +202,10 @@ const signin = async (req) => {
 
   // Get platform identity settings
   // The shape is: { identity: { [profile_type]: { uniques: [ "email" ] } } }
-  let settings = await req.services("settings").call(
-    "get_settings",
-    { category: [profile_type], key: ["identity", "signin"] },
-    {
-      profile: await get_platform_profile(req, platform),
-    },
-  );
+  let settings = await get_settings({
+    req,
+    body: { category: [profile_type], key: ["identity", "signin"] },
+  });
 
   let identity_settings = settings.identity;
 
@@ -459,18 +469,15 @@ const two_fa_challenge = async ({
 };
 
 const signup = async (req) => {
-  let { db, body, headers, services } = req;
+  let { db, body, headers } = req;
   let { platform } = headers;
 
   let { details, profile_type, password } = body;
 
-  let settings = await services("settings").call(
-    "get_settings",
-    { category: [profile_type], key: ["identity", "signup"] },
-    {
-      profile: await get_platform_profile(req),
-    },
-  );
+  let settings = await get_settings({
+    req,
+    body: { category: [profile_type], key: ["identity", "signup"] },
+  });
 
   let identity_settings = settings?.identity;
 
@@ -617,16 +624,15 @@ const two_factor_signup = async (req) => {
   let Profiles = await db.folder("Profiles");
 
   // Re-fetch identity settings to validate uniques still available
-  let settings = await req.services("settings").call(
-    "get_settings",
-    {
+  let settings = await get_settings({
+    req,
+    body: {
       category: {
         or: [profile_type, "general"],
       },
       key: ["identity", "signup"],
     },
-    { profile: await get_platform_profile(req) },
-  );
+  });
 
   let identity_settings = settings?.identity;
 
@@ -713,13 +719,10 @@ const forgot_password = async (req) => {
   let { platform } = headers;
   let { identity, profile_type } = body;
 
-  let settings = await req.services("settings").call(
-    "get_settings",
-    { category: [profile_type], key: ["identity", "forgot_password"] },
-    {
-      profile: await get_platform_profile(req, platform),
-    },
-  );
+  let settings = await get_settings({
+    req,
+    body: { category: [profile_type], key: ["identity", "forgot_password"] },
+  });
 
   let identity_settings = settings.identity;
 
@@ -817,13 +820,10 @@ const reset_password = async (req) => {
     { $set: { key: hash(new_password), updated: Date.now() } },
   );
 
-  let settings = await req.services("settings").call(
-    "get_settings",
-    { category: [profile_type], key: ["identity", "forgot_password"] },
-    {
-      profile: await get_platform_profile(req),
-    },
-  );
+  let settings = await get_settings({
+    req,
+    body: { category: [profile_type], key: ["identity", "forgot_password"] },
+  });
 
   let forgot_password_settings = settings.forgot_password;
 
@@ -884,16 +884,13 @@ const update_profile = async (req) => {
     };
   }
 
-  let settings = await req.services("settings").call(
-    "get_settings",
-    {
+  let settings = await get_settings({
+    req,
+    body: {
       category: [profile.profile],
       key: ["identity"],
     },
-    {
-      profile: await get_platform_profile(req, platform),
-    },
-  );
+  });
 
   let identity_settings = settings?.identity;
 
@@ -983,16 +980,13 @@ const update_profile_identity = async (req) => {
     };
   }
 
-  let settings = await req.services("settings").call(
-    "get_settings",
-    {
+  let settings = await get_settings({
+    req,
+    body: {
       category: [profile.profile],
       key: ["identity", "update_profile_identity"],
     },
-    {
-      profile: await get_platform_profile(req, platform),
-    },
-  );
+  });
 
   let identity_settings = settings?.identity;
 
@@ -1141,16 +1135,13 @@ const confirm_update_profile_identity = async (req) => {
     };
   }
 
-  let settings = await req.services("settings").call(
-    "get_settings",
-    {
+  let settings = await get_settings({
+    req,
+    body: {
       category: [profile.profile],
       key: ["identity"],
     },
-    {
-      profile: await get_platform_profile(req, headers.platform),
-    },
-  );
+  });
 
   let identity_settings = settings.identity;
 

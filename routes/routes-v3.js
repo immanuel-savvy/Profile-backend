@@ -1,7 +1,10 @@
 import {
+  accept_transfer,
+  delete_transfer,
   get_platform,
   get_profile_platforms,
   new_platform,
+  transfer_platform,
   update_platform,
 } from "../handlers/v3/platforms.js";
 import {
@@ -23,17 +26,180 @@ import {
 } from "../handlers/v3/profiles.js";
 import {
   authorise_third_party,
+  get_permissions,
+  get_third_parties,
+  get_third_parties_by_uri,
+  get_third_party,
+  get_third_party_registration,
+  get_third_party_registrations,
+  get_third_party_registrations_by_uri,
   get_token,
+  grant_permission,
   register_third_party,
+  third_party_signin,
+  third_party_signup,
 } from "../handlers/v3/third_party.js";
 import { me, third_party_me, validate } from "../handlers/v3/validate.js";
 
 // 🔑 Route map (KV store)
 const routes = {
   // Third party
+  get_third_party_registrations_by_uri: {
+    handler: get_third_party_registrations_by_uri,
+    security: "api_key",
+    schema: {
+      body: {
+        uris: {
+          required: true,
+          type: "array",
+        },
+      },
+    },
+  },
+  get_third_party_registrations: {
+    handler: get_third_party_registrations,
+    security: "api_key",
+    schema: {
+      body: {
+        limit: {
+          type: "number",
+          default_value: 20,
+        },
+        page: {
+          type: "number",
+          default_value: 0,
+        },
+      },
+    },
+  },
+  get_third_party_registration: {
+    handler: get_third_party_registration,
+    security: "api_key",
+    schema: {
+      body: {
+        uri: {
+          required: true,
+          type: "string",
+        },
+      },
+    },
+  },
+  get_third_parties: {
+    handler: get_third_parties,
+    security: "api_key",
+    schema: {
+      body: {
+        limit: {
+          type: "number",
+          default_value: 20,
+        },
+        page: {
+          default_value: 0,
+          type: "number",
+        },
+      },
+    },
+  },
+  get_third_parties_by_uri: {
+    handler: get_third_parties_by_uri,
+    security: "api_key",
+    schema: {
+      body: {
+        platforms: {
+          type: "array",
+          required: true,
+        },
+      },
+    },
+  },
+  get_third_party: {
+    handler: get_third_party,
+    security: "api_key",
+    schema: {
+      body: {
+        $logic: {
+          or: [
+            {
+              properties: ["token", "owner_uri"],
+              type: "string",
+              required: true,
+            },
+          ],
+        },
+      },
+    },
+  },
+  get_permissions: {
+    security: "auth_token",
+    handler: get_permissions,
+  },
+  grant_permission: {
+    security: "auth_token",
+    handler: grant_permission,
+    schema: {
+      body: {
+        third_party_token: {
+          type: "string",
+          required: true,
+        },
+        session_token: {
+          type: "string",
+          required: true,
+        },
+      },
+    },
+  },
+  third_party_signin: {
+    handler: third_party_signin,
+    security: "api_key",
+    schema: {
+      body: {
+        profile_type: {
+          type: "string",
+          required: true,
+        },
+        third_party_token: {
+          type: "string",
+          required: true,
+        },
+        session_token: {
+          type: "string",
+          required: true,
+        },
+        allow_signup: {
+          type: "boolean",
+          required: false,
+        },
+      },
+    },
+  },
+  third_party_signup: {
+    handler: third_party_signup,
+    security: "api_key",
+    schema: {
+      body: {
+        profile_type: {
+          type: "string",
+          required: true,
+        },
+        third_party_token: {
+          type: "string",
+          required: true,
+        },
+        session_token: {
+          type: "string",
+          required: true,
+        },
+        allow_signin: {
+          type: "boolean",
+          required: false,
+        },
+      },
+    },
+  },
   register_third_party: {
     handler: register_third_party,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         uri: {
@@ -73,7 +239,7 @@ const routes = {
   },
   get_token: {
     handler: get_token,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         profile: {
@@ -111,6 +277,37 @@ const routes = {
   },
 
   // Platforms
+  transfer_platform: {
+    handler: transfer_platform,
+    security: "both",
+    schema: {
+      body: {
+        recipient: {
+          type: "string",
+          required: true,
+        },
+      },
+    },
+  },
+
+  delete_transfer: {
+    handler: delete_transfer,
+    security: "both",
+  },
+
+  accept_transfer: {
+    handler: accept_transfer,
+    security: "auth_token",
+    schema: {
+      body: {
+        uri: {
+          type: "string",
+          required: true,
+        },
+      },
+    },
+  },
+
   new_platform: {
     handler: new_platform,
     security: "second",
@@ -187,7 +384,7 @@ const routes = {
   // Profile Types
   create_profile_type: {
     handler: create_profile_type,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         name: {
@@ -208,7 +405,7 @@ const routes = {
   },
   get_profile_type: {
     handler: get_profile_type,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         $logic: {
@@ -225,11 +422,11 @@ const routes = {
   },
   get_profile_types: {
     handler: get_profile_types,
-    security: "first",
+    security: "api_key",
   },
   update_profile_type: {
     handler: update_profile_type,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         profile_type_id: {
@@ -247,7 +444,7 @@ const routes = {
   // Profiles
   signin: {
     handler: signin,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         credentials: {
@@ -266,7 +463,7 @@ const routes = {
   },
   two_factor_signin: {
     handler: two_factor_signin,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         continuation_token: {
@@ -289,7 +486,7 @@ const routes = {
   },
   signup: {
     handler: signup,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         details: {
@@ -308,7 +505,7 @@ const routes = {
   },
   two_factor_signup: {
     handler: two_factor_signup,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         continuation_token: {
@@ -331,7 +528,7 @@ const routes = {
   },
   forgot_password: {
     handler: forgot_password,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         identity: {
@@ -346,7 +543,7 @@ const routes = {
   },
   reset_password: {
     handler: reset_password,
-    security: "first",
+    security: "api_key",
     schema: {
       body: {
         continuation_token: {

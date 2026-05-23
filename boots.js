@@ -1,376 +1,84 @@
-import {
-  PASSWORDS,
-  PROFILE_TYPES,
-  PROFILES,
-  TOKENS,
-  USERS,
-} from "./ds/folders.js";
+import { Mongo } from "@godprotocol/repositories";
 import { Platform_profile_type_id } from "./handlers/v2/platform.js";
 import { hash } from "./utils/hash.js";
 
-/**
- * =========================
- * HARD-CODED IDS
- * =========================
- */
-
-// USERS
-const ID_USER_EMAIL = "usr_email_001";
-const ID_USER_PROFILE = "usr_profile_001";
-const ID_USER_SETTINGS = "usr_settings_001";
-
-// PROFILE TYPES
-const ID_PROFILE_TYPE_PLATFORM = Platform_profile_type_id;
-const ID_PROFILE_TYPE_SETTINGS = "ptype_settings_001";
-const ID_PROFILE_TYPE_EMAIL = "ptype_email_001";
-
-// PROFILES
-const ID_PROFILE_EMAIL = "prof_email_001";
-const ID_PROFILE_PROFILE = "prof_profile_001";
-const ID_PROFILE_SETTINGS = "prof_settings_001";
-
-const ID_PROFILE_SETTINGS_PROFILE = "prof_settings_profile_001";
-const ID_PROFILE_EMAIL_PROFILE = "prof_email_profile_001";
-const ID_PROFILE_EMAIL_SETTINGS = "prof_email_settings_001";
-
-// TOKENS
-const ID_TOKEN_PROFILE = "token_profile_001";
-const ID_TOKEN_EMAIL = "token_email_001";
-const ID_TOKEN_SETTINGS = "token_settings_001";
-
-/**
- * =========================
- * USERS
- * =========================
- */
-
-let email_user = {
-  name: "Ai Mail",
-  uri: "aimail.savvyaisolution.com",
-  email: "aimail@savvyaisolution.com",
-  created: new Date(),
-  _id: ID_USER_EMAIL,
-};
-
-let profile_user = {
-  name: "Profile",
-  uri: "profile.savvyaisolution.com",
-  email: "profile@savvyaisolution.com",
-  created: new Date(),
-  _id: ID_USER_PROFILE,
-};
-
-let settings_user = {
-  name: "Settings",
-  uri: "settings.savvyaisolution.com",
-  email: "settings@savvyaisolution.com",
-  created: new Date(),
-  _id: ID_USER_SETTINGS,
-};
-
-/**
- * =========================
- * PROFILE TYPES
- * =========================
- */
-
-const profile_type = {
-  name: profile_user.name,
-  created: new Date(),
-  platform: profile_user._id,
-  _id: ID_PROFILE_TYPE_PLATFORM,
-};
-
-let settings_profile_type = {
-  name: settings_user.name,
-  created: new Date(),
-  platform: settings_user._id,
-  _id: ID_PROFILE_TYPE_SETTINGS,
-};
-
-let email_profile_type = {
-  name: email_user.name,
-  created: new Date(),
-  platform: email_user._id,
-  _id: ID_PROFILE_TYPE_EMAIL,
-};
-
-/**
- * =========================
- * PROFILES
- * =========================
- */
-
-let settings_profile = {
-  name: settings_user.name,
-  created: new Date(),
-  email: settings_user.email,
-  platform: profile_user._id,
-  _id: settings_user._id,
-  profile: profile_type._id,
-};
-
-let email_profile = {
-  name: email_user.name,
-  email: email_user.email,
-  created: new Date(),
-  platform: profile_user._id,
-  _id: email_user._id,
-  profile: profile_type._id,
-};
-
-let profile_profile = {
-  name: profile_user.name,
-  email: profile_user.email,
-  created: new Date(),
-  platform: profile_user._id,
-  _id: profile_user._id,
-  profile: profile_type._id,
-};
-
-let setting_setting = {
-  name: settings_profile.name,
-  email: settings_user.email,
-  platform: settings_user._id,
-  profile: settings_profile_type._id,
-  created: new Date(),
-  _id: `Setting_${settings_profile._id}`,
-};
-
-let email_email = {
-  name: email_profile.name,
-  email: email_user.email,
-  platform: email_user._id,
-  profile: email_profile_type._id,
-  created: new Date(),
-  _id: `Email_${email_profile._id}`,
-};
-
-let settings_email = {
-  name: settings_profile.name,
-  email: settings_profile.email,
-  created: new Date(),
-  _id: `Email_${settings_profile._id}`,
-  platform: email_user._id,
-  profile: email_profile_type._id,
-};
-
-let email_settings = {
-  name: email_user.name,
-  email: email_user.email,
-  created: new Date(),
-  _id: `Setting_${email_user._id}`,
-  platform: settings_user._id,
-  profile: settings_profile_type._id,
-};
-
-const email_setting_adjustment = async () => {
-  let Profiles = await PROFILES();
-  console.log("Adding..");
-  if (await Profiles.findOne({ _id: settings_email._id })) {
-    return;
-  }
-  console.log("Actually adding..");
-
-  let prfs = [settings_email, email_settings];
-  await Profiles.insertMany(prfs);
-  await (
-    await PASSWORDS()
-  ).insertMany(
-    prfs.map((p) => {
-      return {
-        _id: p._id,
-        key: hash(p.name),
-        created: new Date(),
-      };
-    }),
-  );
-};
-
-export { email_setting_adjustment };
-
-const addjustment = async () => {
-  let Profiles = await PROFILES();
-  console.log("Adding..");
-  if (await Profiles.findOne({ _id: setting_setting._id })) {
-    return;
-  }
-  console.log("Actually adding..");
-
-  let prfs = [setting_setting, email_email];
-  await Profiles.insertMany(prfs);
-  await (
-    await PASSWORDS()
-  ).insertMany(
-    prfs.map((p) => {
-      return {
-        _id: p._id,
-        key: hash(p.name),
-        created: new Date(),
-      };
-    }),
-  );
-};
-
-export { addjustment };
-// Cross-platform profiles
-
-let profile_settings_profile = {
-  name: profile_user.name,
-  email: profile_user.email,
-  created: new Date(),
-  platform: settings_user._id,
-  _id: ID_PROFILE_SETTINGS_PROFILE,
-  profile: settings_profile_type._id,
-};
-
-let profile_email_profile = {
-  name: profile_user.name,
-  email: profile_user.email,
-  created: new Date(),
-  platform: email_user._id,
-  _id: ID_PROFILE_EMAIL_PROFILE,
-  profile: email_profile_type._id,
-};
-
-let email_settings_profile = {
-  name: email_user.name,
-  email: profile_user.email,
-  created: new Date(),
-  platform: settings_user._id,
-  _id: ID_PROFILE_EMAIL_SETTINGS,
-  profile: settings_profile_type._id,
-};
-
-/**
- * =========================
- * PASSWORDS
- * =========================
- */
-
-let passwords = [
-  {
-    _id: profile_user._id,
-    key: hash(profile_user.name),
-    created: new Date(),
-  },
-  {
-    _id: email_user._id,
-    key: hash(email_user.name),
-    created: new Date(),
-  },
-  {
-    _id: settings_user._id,
-    key: hash(settings_user.name),
-    created: new Date(),
-  },
-  {
-    _id: profile_profile._id,
-    key: hash(profile_profile.name),
-    created: new Date(),
-  },
-];
-
-let profiles_passwords = [
-  {
-    _id: profile_settings_profile._id,
-    key: hash(profile_settings_profile.name),
-    created: new Date(),
-  },
-  {
-    _id: profile_email_profile._id,
-    key: hash(profile_email_profile.name),
-    created: new Date(),
-  },
-  {
-    _id: email_settings_profile._id,
-    key: hash(email_settings_profile.name),
-    created: new Date(),
-  },
-];
-
-/**
- * =========================
- * TOKENS
- * =========================
- */
-
-const tokens = [
-  {
-    _id: ID_TOKEN_PROFILE,
-    token: "token_value_profile_001",
-    user: ID_USER_PROFILE,
-    created: new Date(),
-  },
-  {
-    _id: ID_TOKEN_EMAIL,
-    token: "token_value_email_001",
-    user: ID_USER_EMAIL,
-    created: new Date(),
-  },
-  {
-    _id: ID_TOKEN_SETTINGS,
-    token: "token_value_settings_001",
-    user: ID_USER_SETTINGS,
-    created: new Date(),
-  },
-];
-
-/**
- * =========================
- * BOOTSTRAP
- * =========================
- */
+let Profile_platform_id = "7ab29b3f-37c5-4957-b61f-d5d209aee8d8";
+let Profile_profile_id = "01a84e70-2227-4865-95e1-71072b2badb3";
 
 const boots = async () => {
-  let Profile_types = await PROFILE_TYPES();
+  let db = new Mongo({
+    db_url: process.env.MONGODB_URI,
+    db_name: "v3-profiles",
+  });
 
-  console.log("Checking if profile types exist...");
-  if (await Profile_types.findOne({ _id: ID_PROFILE_TYPE_PLATFORM })) return;
+  let Profiles = await db.collection("Profiles");
 
-  console.log("Profile types not found, creating...");
+  let exist = await Profiles.findOne();
+  if (exist) {
+    console.log(exist);
+    return;
+  }
 
-  let Users = await USERS();
-  let Profiles = await PROFILES();
-  let Passwords = await PASSWORDS();
-  let Tokens = await TOKENS();
+  let profiles = [
+    {
+      fullname: "Immanuel Savvy",
+      email: "immanuelsavvy@gmail.com",
+      profile: Platform_profile_type_id,
+      platform: "platform",
+      created: Date.now(),
+      _id: Profile_profile_id,
+    },
+  ];
 
-  await Users.insertMany([email_user, profile_user, settings_user]);
+  let Platforms = await db.collection("Platforms");
 
-  await Profile_types.insertMany([
-    profile_type,
-    settings_profile_type,
-    email_profile_type,
-  ]);
+  let platforms = [
+    {
+      name: "Profile",
+      profile: profiles[0]._id,
+      uri: "profiles.savvyaisolution.com",
+      created: Date.now(),
+      _id: Profile_platform_id,
+    },
+  ];
 
-  await Profiles.insertMany([email_profile, profile_profile, settings_profile]);
+  let ProfileTypes = await db.collection("Profile_types");
 
+  let profile_types = [
+    {
+      name: "Platform",
+      platform: platforms[0]._id,
+      created: Date.now(),
+      _id: Platform_profile_type_id,
+      description: "Platform Profile Type",
+    },
+  ];
+
+  let Tokens = await db.collection("Platform_tokens");
+  let tokens = [
+    {
+      platform: platforms[0]._id,
+      token: "platform_token",
+      created: Date.now(),
+      _id: "af626129-86e4-4239-b33d-560782a48245",
+    },
+  ];
+
+  let Passwords = await db.collection("Profile_passwords");
+  let passwords = [
+    {
+      profile: profiles[0]._id,
+      key: hash("123456"),
+      created: Date.now(),
+      _id: "b1e426e0-3dc6-4d40-ab6e-0d6f3fa39035",
+    },
+  ];
+
+  await Profiles.insertMany(profiles);
   await Passwords.insertMany(passwords);
+  await ProfileTypes.insertMany(profile_types);
   await Tokens.insertMany(tokens);
+  await Platforms.insertMany(platforms);
 };
 
-/**
- * =========================
- * EXTRA PROFILE CREATION
- * =========================
- */
-
-const create_profiles = async () => {
-  let Profiles = await PROFILES();
-  let Passwords = await PASSWORDS();
-
-  // Prevent duplicate insert
-  console.log("Checking if cross-platform profiles exist...");
-  if (await Profiles.findOne({ _id: ID_PROFILE_EMAIL_PROFILE })) return;
-  console.log("Cross-platform profiles not found, creating...");
-
-  await Profiles.insertMany([
-    profile_settings_profile,
-    profile_email_profile,
-    email_settings_profile,
-  ]);
-
-  await Passwords.insertMany(profiles_passwords);
-};
-
-export { boots, create_profiles };
+export { boots, Profile_platform_id, Profile_profile_id };
