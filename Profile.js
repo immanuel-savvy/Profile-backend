@@ -29,6 +29,7 @@ setTimeout(async () => {
     platform_uri: process.env.PLATFORM_URI,
     api_key: process.env.API_KEY,
     db_config: {
+      db_name: "v3-profiles",
       db_url: process.env.MONGODB_URI,
     },
   });

@@ -1,6 +1,6 @@
-import { Profile_profile_id } from "../../boots";
-import { Platform_profile_type_id } from "../v2/platform";
-import { get_platform_profile } from "./profiles";
+import { Profile_profile_id } from "../../boots.js";
+import { Platform_profile_type_id } from "../v2/platform.js";
+import { get_platform_profile } from "./profiles.js";
 
 const new_platform = async (req) => {
   let { db, headers, body } = req;

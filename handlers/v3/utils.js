@@ -1,4 +1,4 @@
-import { get_platform_profile } from "./profiles";
+import { get_platform_profile } from "./profiles.js";
 
 const get_settings = async ({ req, body, profile, options }) => {
   let { full } = options || {};
