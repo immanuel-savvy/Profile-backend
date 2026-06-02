@@ -26,14 +26,6 @@ const register_third_party = async (req) => {
 
   let { uri, permissions = {}, profile_types } = body;
 
-  if (!uri) {
-    return {
-      ok: false,
-      status: 400,
-      message: "uri required",
-    };
-  }
-
   let Third_party = await db.folder("Third_party_platforms");
 
   /**
@@ -591,10 +583,27 @@ const third_party_signup = async (req) => {
       _id: crypto.randomUUID(),
     };
 
+    let confirm_not_present = {};
     identity_settings.uniques.map((u) => {
       let v = session_profile[u];
-      if (v != null) new_profile[u] = v;
+      if (v != null) {
+        confirm_not_present[u] = v;
+        new_profile[u] = v;
+      }
     });
+
+    let existing = await Profiles.findOne({
+      profile: profile_type,
+      ...confirm_not_present,
+    });
+    if (existing) {
+      return {
+        ok: false,
+        message: "Profile already exist",
+        response_code: "profile_already_exist",
+        status: 400,
+      };
+    }
 
     if (session_profile.fullname)
       if (session_profile.fullname) {
@@ -761,11 +770,46 @@ const get_permissions = async (req) => {
   return { ok: true, data, message: "Permissions read." };
 };
 
+const third_party_profile = async (req) => {
+  // This endpoint is used by a platform profile to retrieve another profile of his that is authenticated into said platform.
+
+  let { headers, db, body } = req;
+  let { profile } = headers;
+  let { third_party_profile } = body;
+
+  let Sessions = await db.folder("Sessions");
+  let sess = await Sessions.findOne({
+    profile: profile._id,
+    "third_party.profile": third_party_profile,
+  });
+
+  if (!sess) {
+    return {
+      ok: false,
+      message: "Not authorised",
+      status: 400,
+    };
+  }
+
+  let Profiles = await db.folder("Profiles");
+  let prof = await Profiles.findOne({ _id: third_party_profile });
+  let profile_type = await (
+    await db.folder("Profile_types")
+  ).findOne({ _id: prof.profile });
+
+  return {
+    ok: true,
+    message: "Your Third Party profile",
+    data: { profile: prof, profile_type },
+  };
+};
+
 export {
   register_third_party,
   authorise_third_party,
   refresh_third_party_token,
   get_token,
+  third_party_profile,
   third_party_signin,
   get_third_parties_by_uri,
   third_party_signup,

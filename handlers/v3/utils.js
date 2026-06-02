@@ -6,13 +6,13 @@ const get_settings = async ({ req, body, profile, options }) => {
   if (!profile) {
     profile = await get_platform_profile(req);
   }
-  let res = await req
-    .services("settings")
-    .call("get_settings", body, profile && { profile });
+  let res = await (
+    await req.services("settings")
+  ).call("get_settings", body, profile && { profile });
 
   if (full) return res;
 
-  return res?.data;
+  return res?.data || {};
 };
 
 const pagination = async (folder, { limit, skip, query }) => {

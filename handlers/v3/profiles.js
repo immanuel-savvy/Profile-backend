@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { hash } from "../../utils/hash.js";
 import { get_settings } from "./utils.js";
 
@@ -5,7 +6,9 @@ const get_platform_profile = async (req, platform) => {
   let { db } = req;
   platform = platform || req.headers.platform;
 
-  let res = await db.folder("Profiles").findOne({ profile: platform?._id });
+  let res = await (
+    await db.folder("Profiles")
+  ).findOne({ profile: platform?._id });
 
   return res;
 };
@@ -88,6 +91,7 @@ export const create_session_object = async (
     is_refresh,
     by,
   } = options || {};
+
   let Sessions = await req.db.folder("Sessions");
   let obj = {
     _id: crypto.randomUUID(),
@@ -120,7 +124,7 @@ export const create_session_object = async (
         body: { category: [profile.profile], key: ["sessions"] },
       });
 
-      session_settings = settings.sessions;
+      session_settings = settings?.sessions;
     }
 
     if (session_settings?.notify?.enabled) {
@@ -200,6 +204,12 @@ const signin = async (req) => {
   let { platform } = req.headers;
   const { credentials, profile_type, meta_payload } = req.body;
 
+  let Profile_types = await db.folder("Profile_types");
+  let profile_type_entry = await Profile_types.findOne({ _id: profile_type });
+  if (!profile_type_entry) {
+    return { ok: false, status: 400, message: "Invalid profile type" };
+  }
+
   // Get platform identity settings
   // The shape is: { identity: { [profile_type]: { uniques: [ "email" ] } } }
   let settings = await get_settings({
@@ -207,24 +217,25 @@ const signin = async (req) => {
     body: { category: [profile_type], key: ["identity", "signin"] },
   });
 
-  let identity_settings = settings.identity;
+  console.log(settings);
+  let identity_settings = settings?.identity;
 
   if (!identity_settings) {
     // Default to email if not specified
-    settings = {
-      identity: {
-        [profile_type]: {
-          uniques: ["email"],
-        },
+    identity_settings = {
+      [profile_type]: {
+        uniques: ["email"],
       },
-    };
-  }
+    }[profile_type];
+  } else identity_settings = identity_settings[profile_type];
 
   const Profiles = await db.folder("Profiles");
 
+  console.log(platform, "uhh");
   // Build query based on unique fields
-  let query = { profile: profile_type };
-  for (let field of identity_settings.uniques) {
+  let query = { profile: profile_type, platform: platform._id };
+
+  for (let field of identity_settings?.uniques) {
     if (!credentials[field]) {
       return {
         ok: false,
@@ -250,9 +261,9 @@ const signin = async (req) => {
     return { ok: false, status: 401, message: "Incorrect password" };
   }
 
-  let signin_settings = settings.signin;
+  let signin_settings = settings?.signin?.[profile_type];
 
-  if (signin_settings) {
+  if (signin_settings?.enabled) {
     let res = await two_fa_challenge({
       req,
       profile,
@@ -347,7 +358,7 @@ const two_fa_challenge = async ({
 
   if (two_fa_settings) {
     let signin_response, continuation;
-    if (two_fa_settings.two_factor_auth?.enabled) {
+    if (two_fa_settings?.enabled) {
       if (two_fa_settings.two_factor_auth?.type === "otp") {
         continuation = await generate_otp({
           db,
@@ -482,12 +493,13 @@ const signup = async (req) => {
   let identity_settings = settings?.identity;
 
   if (!identity_settings) {
-    return {
-      ok: false,
-      status: 400,
-      message: "Invalid profile type",
-    };
-  }
+    // Default to email if not specified
+    identity_settings = {
+      [profile_type]: {
+        uniques: ["email"],
+      },
+    }[profile_type];
+  } else identity_settings = identity_settings[profile_type];
 
   let Profiles = await db.folder("Profiles");
 
@@ -724,7 +736,7 @@ const forgot_password = async (req) => {
     body: { category: [profile_type], key: ["identity", "forgot_password"] },
   });
 
-  let identity_settings = settings.identity;
+  let identity_settings = settings?.identity;
 
   if (!identity_settings) {
     return {
@@ -825,7 +837,7 @@ const reset_password = async (req) => {
     body: { category: [profile_type], key: ["identity", "forgot_password"] },
   });
 
-  let forgot_password_settings = settings.forgot_password;
+  let forgot_password_settings = settings?.forgot_password;
 
   if (forgot_password_settings?.notification?.enabled) {
     let Profiles = await db.folder("Profiles");
@@ -1143,7 +1155,7 @@ const confirm_update_profile_identity = async (req) => {
     },
   });
 
-  let identity_settings = settings.identity;
+  let identity_settings = settings?.identity;
 
   const identity = continuation.meta_payload.identity;
 

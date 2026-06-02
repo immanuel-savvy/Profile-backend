@@ -5,6 +5,7 @@ import {
   get_platform_token,
   get_profile_platforms,
   new_platform,
+  remove_platform,
   transfer_platform,
   update_platform,
 } from "../handlers/v3/platforms.js";
@@ -37,6 +38,7 @@ import {
   get_token,
   grant_permission,
   register_third_party,
+  third_party_profile,
   third_party_signin,
   third_party_signup,
 } from "../handlers/v3/third_party.js";
@@ -254,6 +256,18 @@ const routes = {
       },
     },
   },
+  third_party_profile: {
+    handler: third_party_profile,
+    security: "auth_token",
+    schema: {
+      body: {
+        third_party_profile: {
+          type: "string",
+          required: true,
+        },
+      },
+    },
+  },
 
   // Validate
   validate: {
@@ -320,7 +334,7 @@ const routes = {
 
   new_platform: {
     handler: new_platform,
-    security: "second",
+    security: "auth_token",
     schema: {
       body: {
         name: {
@@ -339,9 +353,21 @@ const routes = {
       },
     },
   },
+  remove_platform: {
+    handler: remove_platform,
+    security: "auth_token",
+    schema: {
+      body: {
+        uri: {
+          required: true,
+          type: "string",
+        },
+      },
+    },
+  },
   get_platform: {
     handler: get_platform,
-    security: "second",
+    security: "auth_token",
     schema: {
       body: {
         $logic: {
@@ -358,7 +384,7 @@ const routes = {
   },
   update_platform: {
     handler: update_platform,
-    security: "second",
+    security: "auth_token",
     schema: {
       body: {
         uri: {
@@ -374,7 +400,7 @@ const routes = {
   },
   get_profile_platforms: {
     handler: get_profile_platforms,
-    security: "second",
+    security: "auth_token",
     schema: {
       body: {
         page: {
@@ -433,6 +459,20 @@ const routes = {
   get_profile_types: {
     handler: get_profile_types,
     security: "api_key",
+    schema: {
+      body: {
+        page: {
+          required: false,
+          default_value: 1,
+          type: "number",
+        },
+        limit: {
+          required: false,
+          default_value: 20,
+          type: "number",
+        },
+      },
+    },
   },
   update_profile_type: {
     handler: update_profile_type,
@@ -581,7 +621,7 @@ const routes = {
 
   update_profile: {
     handler: update_profile,
-    security: "second",
+    security: "auth_token",
     schema: {
       body: {
         updates: {
@@ -593,7 +633,7 @@ const routes = {
   },
   update_profile_identity: {
     handler: update_profile_identity,
-    security: "second",
+    security: "auth_token",
     schema: {
       body: {
         identity: {
@@ -606,7 +646,7 @@ const routes = {
 
   confirm_update_profile_identity: {
     handler: confirm_update_profile_identity,
-    security: "second",
+    security: "auth_token",
     schema: {
       body: {
         continuation_token: {

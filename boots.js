@@ -11,22 +11,44 @@ const boots = async () => {
     db_name: "v3-profiles",
   });
 
+  // let Cache = await db.collection(`$CACHE-auth`);
+  // let cache = await Cache.find().toArray();
+  // console.log(JSON.stringify(cache));
+
+  // await Cache.deleteMany();
+  // return;
   let Profiles = await db.collection("Profiles");
 
-  let exist = await Profiles.findOne();
-  if (exist) {
-    console.log(exist);
-    return;
-  }
+  // let exist = await Profiles.findOne();
+  // if (exist) {
+  //   console.log(exist);
+  //   return;
+  // }
 
   let profiles = [
     {
       fullname: "Immanuel Savvy",
       email: "immanuelsavvy@gmail.com",
       profile: Platform_profile_type_id,
-      platform: "platform",
+      platform: Profile_platform_id,
       created: Date.now(),
       _id: Profile_profile_id,
+    },
+    {
+      fullname: "Immanuel Savvy",
+      email: "immanuelsavvy@gmail.com",
+      profile: "fb065baf-c20b-4e13-ad09-60ae040b442e",
+      platform: "ad4c0eda-cd1a-4513-94bf-1df8d1539977",
+      created: Date.now(),
+      _id: "ab065baf-c20b-4e13-ad09-60ae040b44c",
+    },
+    {
+      fullname: "Immanuel Savvy",
+      email: "immanuelsavvy@gmail.com",
+      profile: "206497e3-4f20-4ff0-aece-7ebdb6a86796",
+      platform: "98af501d-13da-40f9-976f-3304b19d2c73",
+      created: Date.now(),
+      _id: "306497e3-4f20-4ff0-aece-7ebdb6a86797",
     },
   ];
 
@@ -72,13 +94,26 @@ const boots = async () => {
       created: Date.now(),
       _id: "b1e426e0-3dc6-4d40-ab6e-0d6f3fa39035",
     },
+    {
+      profile: profiles[1]._id,
+      key: hash("123456"),
+      created: Date.now(),
+      _id: "c1e426e0-3dc6-4d40-ab6e-0d6f3fa39036",
+    },
+    {
+      profile: profiles[2]._id,
+      key: hash("123456"),
+      created: Date.now(),
+      _id: "a1e426e0-3dc6-4d40-ab6e-0d6f3fa39034",
+    },
   ];
 
-  await Profiles.insertMany(profiles);
-  await Passwords.insertMany(passwords);
-  await ProfileTypes.insertMany(profile_types);
-  await Tokens.insertMany(tokens);
-  await Platforms.insertMany(platforms);
+  // await Profiles.insertMany(profiles.slice(1));
+  // await Passwords.insertMany(passwords.slice(1));
+  // await ProfileTypes.insertMany(profile_types);
+  // await Tokens.insertMany(tokens);
+  // await Platforms.insertMany(platforms);
+  console.log("Bootstrapped database with initial data");
 };
 
 export { boots, Profile_platform_id, Profile_profile_id };

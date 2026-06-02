@@ -7,14 +7,6 @@ const create_profile_type = async (req) => {
 
   let { name, type, description } = body;
 
-  if (!name || !type) {
-    return {
-      ok: false,
-      status: 400,
-      message: "Name and type are required",
-    };
-  }
-
   let Profile_types = await db.folder("Profile_types");
 
   if (
@@ -53,15 +45,24 @@ const create_profile_type = async (req) => {
 };
 
 const get_profile_types = async (req) => {
-  let { headers, db } = req;
+  let { headers, db, body } = req;
 
   let { platform } = headers;
+  console.log(platform, "uhh", body);
+  let { limit, page } = body;
 
+  let skip = 0;
+  if (page && limit) {
+    skip = (page - 1) * limit;
+  }
   let Profile_types = await db.folder("Profile_types");
 
   let profile_types = await Profile_types.find({
     platform: platform._id,
-  }).toArray();
+  })
+    .skip(skip)
+    .limit(limit)
+    .toArray();
 
   return {
     ok: true,
@@ -114,22 +115,6 @@ const update_profile_type = async (req) => {
   let { platform } = headers;
 
   let { profile_type_id, updates = {} } = body;
-
-  if (!profile_type_id) {
-    return {
-      ok: false,
-      status: 400,
-      message: "profile_type_id is required",
-    };
-  }
-
-  if (!updates || typeof updates !== "object") {
-    return {
-      ok: false,
-      status: 400,
-      message: "Invalid updates payload",
-    };
-  }
 
   let Profile_types = await db.folder("Profile_types");
 

@@ -3,7 +3,7 @@ const validate = async (req) => {
   let api_key = headers["x-api-key"];
 
   let Platforms = await db.folder("Platforms");
-  let Tokens = await db.folder("Tokens");
+  let Tokens = await db.folder("Platform_tokens");
 
   let token_data = await Tokens.findOne({ token: api_key });
   if (!token_data) {
@@ -26,7 +26,7 @@ const validate = async (req) => {
   return {
     ok: true,
     message: "Token valid",
-    data: platform,
+    data: { platform },
   };
 };
 
@@ -44,6 +44,7 @@ const me = async (req) => {
     };
   } else authorization = authorization.replace("Bearer ", "");
 
+  console.log(authorization, x_platform);
   let Sessions = await db.folder("Sessions");
   let session = await Sessions.findOne({
     token: authorization,

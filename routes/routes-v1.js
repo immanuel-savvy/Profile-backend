@@ -61,26 +61,35 @@ const routes = {
   "/user_profiles": user_profiles,
 };
 
-const router = async (req, res) => {
+const router = async (req, responder) => {
+  let res = {
+    json(payload) {
+      responder.setHeader("Content-Type", "application/json");
+      responder.end(JSON.stringify(payload));
+    },
+  };
+
   try {
-    const path = req.path; // e.g. "/register"
+    // console.log(`Incoming request: ${req.method} ${req.url}`);
+    const path = req.url; // e.g. "/register"
     const method = req.method.toUpperCase(); // optional if you want method-based routing
 
     const handler = routes[path];
 
     if (!handler) {
-      return res.status(404).json({
+      return res.json({
         error: "Route not found",
         path,
       });
     }
 
     // Call handler
+
     return await handler(req, res);
   } catch (err) {
     console.error("Router Error:", err);
 
-    return res.status(500).json({
+    return res.json({
       ok: false,
       message: "Internal server error",
     });

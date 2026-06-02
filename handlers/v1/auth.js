@@ -187,6 +187,8 @@ const get_user = async (req, res) => {
   let { email, token } = req.body;
 
   if (email) email = email.trim().toLowerCase();
+
+  console.log("Get user request for email:", email, "with token:", token);
   let user = await (await USERS()).findOne({ email });
 
   res.json({

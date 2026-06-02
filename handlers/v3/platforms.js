@@ -1,6 +1,7 @@
 import { Profile_profile_id } from "../../boots.js";
 import { Platform_profile_type_id } from "../v2/platform.js";
 import { get_platform_profile } from "./profiles.js";
+import crypto from "crypto";
 
 const new_platform = async (req) => {
   let { db, headers, body } = req;
@@ -425,6 +426,37 @@ const get_platform_token = async (req) => {
   };
 };
 
+const remove_platform = async (req) => {
+  let { headers, db, body } = req;
+  let { profile } = headers;
+  let { uri } = body;
+
+  let Platforms = await db.folder("Platforms");
+  let platform = await Platforms.findOne({ uri });
+  if (!platform) {
+    return {
+      ok: false,
+      message: "Platform not found",
+      status: 400,
+    };
+  }
+  if (platform.profile !== profile._id) {
+    return {
+      ok: false,
+      message: "Profile not owner",
+      status: 400,
+    };
+  }
+
+  await Platforms.deleteOne({ _id: platform._id });
+
+  return {
+    ok: true,
+    data: platform,
+    message: "Platform removed.",
+  };
+};
+
 export {
   new_platform,
   get_platform,
@@ -435,4 +467,5 @@ export {
   accept_transfer,
   delete_transfer,
   get_platform_token,
+  remove_platform,
 };
