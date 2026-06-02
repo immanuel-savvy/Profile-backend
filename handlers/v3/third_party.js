@@ -47,6 +47,18 @@ const register_third_party = async (req) => {
     };
   }
 
+  let Platforms = await db.folder("Platforms");
+
+  let target_platform = await Platforms.findOne({ uri });
+
+  if (!target_platform) {
+    return {
+      ok: false,
+      status: 404,
+      message: "Target platform not found",
+    };
+  }
+
   let api_key = crypto.randomBytes(24).toString("hex");
 
   let third_party = {
