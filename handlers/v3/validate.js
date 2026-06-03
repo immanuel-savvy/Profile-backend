@@ -59,14 +59,14 @@ const me = async (req) => {
     };
   }
 
-  if (session && session.created < Date.now() - 1000 * 60 * 60 * 24) {
-    await Sessions.deleteOne({ _id: session._id });
-    return {
-      ok: false,
-      message: "Session expired",
-      status: 401,
-    };
-  }
+  // if (session && session.created < Date.now() - 1000 * 60 * 60 * 24) {
+  //   await Sessions.deleteOne({ _id: session._id });
+  //   return {
+  //     ok: false,
+  //     message: "Session expired",
+  //     status: 401,
+  //   };
+  // }
 
   let Profiles = await db.folder("Profiles");
   let profile = await Profiles.findOne({ _id: session.profile });

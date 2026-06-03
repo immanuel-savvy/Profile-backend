@@ -204,8 +204,10 @@ const signin = async (req) => {
   let { platform } = req.headers;
   const { credentials, profile_type, meta_payload } = req.body;
 
+  console.log(credentials, profile_type);
   let Profile_types = await db.folder("Profile_types");
   let profile_type_entry = await Profile_types.findOne({ _id: profile_type });
+
   if (!profile_type_entry) {
     return { ok: false, status: 400, message: "Invalid profile type" };
   }
@@ -490,7 +492,7 @@ const signup = async (req) => {
     body: { category: [profile_type], key: ["identity", "signup"] },
   });
 
-  let identity_settings = settings?.identity;
+  let identity_settings = settings?.[profile_type]?.identity;
 
   if (!identity_settings) {
     // Default to email if not specified
@@ -534,7 +536,7 @@ const signup = async (req) => {
       ok: false,
       status: 409,
       message: "Identity already in use",
-      data: { profile_id: existing._id },
+      data: { profile_id: existing._id, details: or },
     };
   }
 
@@ -546,7 +548,8 @@ const signup = async (req) => {
     created: new Date(),
   };
 
-  let two_fa_settings = settings?.signup?.two_fa_settings;
+  let signup_settings = settings?.[profile_type]?.signup;
+  let two_fa_settings = signup_settings?.two_fa_settings;
 
   if (two_fa_settings?.enabled) {
     let continuation = await two_fa_challenge({
@@ -612,7 +615,7 @@ const signup = async (req) => {
     ok: true,
     status: 201,
     message: "Signup successful",
-    data: { _id: newProfile._id },
+    data: newProfile,
   };
 };
 
