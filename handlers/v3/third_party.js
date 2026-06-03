@@ -170,7 +170,6 @@ const get_third_party = async (req) => {
 
   let query = { uri: platform.uri };
   if (token) query.token = token;
-  if (owner_uri) query.owner_platform_uri = owner_uri;
 
   let data = await Third_party_platforms.findOne(query);
 
@@ -191,7 +190,6 @@ const get_third_parties = async (req) => {
 
   let Third_party_platforms = await db.folder("Third_party_platforms");
 
-  // Try to resolve platform id if possible, but allow matching by owner_platform_uri as well.
   let items = await Third_party_platforms.find({ uri: platform.uri })
     .limit(limit)
     .skip(limit * page)
@@ -260,8 +258,9 @@ const authorise_third_party = async (req) => {
   let { db, headers, body } = req;
 
   let { platform, profile } = headers;
+  console.log(platform, profile, "HEADERS OF AUTHORISE THIRD PARTY");
 
-  let { third_party_token, platform_uri, session_token } = body;
+  let { third_party_token, session_token } = body;
 
   let Third_party = await db.folder("Third_party_platforms");
 
@@ -279,13 +278,10 @@ const authorise_third_party = async (req) => {
     };
   }
 
-  if (integration.owner_platform_uri !== platform_uri) {
-    return {
-      ok: false,
-      status: 401,
-      message: "Third party token not valid for this platform",
-    };
-  }
+  let integration_platform = await (
+    await db.folder("Platforms")
+  ).findOne({ _id: integration.owner_platform });
+
   if (integration.uri !== platform.uri) {
     return {
       ok: false,
@@ -294,12 +290,16 @@ const authorise_third_party = async (req) => {
     };
   }
 
-  let Sessions = await db.folder("sessions");
+  let Sessions = await db.folder("Sessions");
 
+  console.log(
+    session_token,
+    integration_platform,
+    "SESSION TOKEN AND INTEGRATION PLATFORM",
+  );
   let session = await Sessions.findOne({
     token: session_token,
-
-    platform_uri,
+    platform_uri: integration_platform.uri,
   });
 
   if (!session) {
@@ -309,8 +309,6 @@ const authorise_third_party = async (req) => {
       message: "Invalid session token",
     };
   }
-
-  // if (session.created )
 
   let Profiles = await db.folder("Profiles");
 
@@ -326,13 +324,9 @@ const authorise_third_party = async (req) => {
     };
   }
 
-  let Platforms = await db.folder("Platforms");
-
-  let xplatform = await Platforms.findOne({ uri: platform_uri });
-
   let response_session = await create_session_object(
     session_profile,
-    xplatform,
+    integration_platform,
     req,
     {
       third_party: {
@@ -450,7 +444,7 @@ const handle_permissions_session = async ({
 
 const third_party_signin = async (req, opt) => {
   let { from_signup } = opt || {};
-  let { headers, db } = req;
+  let { headers, db, body } = req;
 
   let { platform } = headers;
   let {
@@ -475,7 +469,9 @@ const third_party_signin = async (req, opt) => {
     };
   }
 
-  if (third_party.profile_types.include(profile_type)) {
+  // console.log(third_party.profile_types, profile_type, "PROFILE TYPE CHECK");
+
+  if (!third_party.profile_types.includes(profile_type)) {
     return {
       ok: false,
       response_code: "type_out_of_scope",
@@ -507,8 +503,8 @@ const third_party_signin = async (req, opt) => {
   session_profile = await Profiles.findOne({ _id: session_profile.profile });
 
   // Retrieve settings
-  let setting_keys = ["identity", "signin", "session"];
-  if (from_signup) setting_keys.push("signup");
+  let setting_keys = ["identity", from_signup ? "signup" : "signin", "session"];
+
   let settings = await get_settings({
     req,
     body: {
@@ -517,7 +513,12 @@ const third_party_signin = async (req, opt) => {
     },
   });
 
-  let identity_settings = settings.identity;
+  let identity_settings = settings?.[profile_type]?.identity;
+  if (!identity_settings) {
+    identity_settings = {
+      uniques: ["email"],
+    };
+  }
 
   const or = identity_settings.uniques.map((field) => ({
     [field]: session_profile[field],
@@ -525,7 +526,7 @@ const third_party_signin = async (req, opt) => {
 
   const profile = await Profiles.findOne({ profile: profile_type, $or: or });
 
-  if (from_signup && !allow_signin) {
+  if (profile && from_signup && !allow_signin) {
     return {
       ok: false,
       message: "Profile already exist",
@@ -552,8 +553,8 @@ const third_party_signin = async (req, opt) => {
   }
 
   let response = await create_session_object(profile, platform, req, {
-    session_settings: settings.session,
-    by: uri,
+    session_settings: settings?.[profile_type]?.session,
+    by: session_platform.uri,
   });
 
   let tokens = await handle_permissions_session({
@@ -586,7 +587,12 @@ const third_party_signup = async (req) => {
     let { payload } = req;
     let { settings, session_platform, session_profile } = payload;
 
-    let identity_settings = settings.identity;
+    let identity_settings = settings?.[profile_type]?.identity;
+    if (!identity_settings) {
+      identity_settings = {
+        uniques: ["email"],
+      };
+    }
 
     let new_profile = {
       profile: profile_type,

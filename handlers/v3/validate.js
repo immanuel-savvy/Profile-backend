@@ -79,12 +79,14 @@ const me = async (req) => {
     };
   }
 
+  let Platforms = await db.folder("Platforms");
+
   return {
     ok: true,
     message: "Session valid",
     data: {
       profile,
-      platform: session.platform_uri,
+      platform: await Platforms.findOne({ uri: session.platform_uri }),
     },
   };
 };
@@ -157,6 +159,7 @@ const third_party_me = async (req) => {
     message: "Session valid",
     data: {
       profile,
+      platform: platform,
       third_party: third,
       xplatform: platform,
     },

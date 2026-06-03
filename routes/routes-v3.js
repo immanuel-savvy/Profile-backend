@@ -222,16 +222,12 @@ const routes = {
   },
   authorise_third_party: {
     handler: authorise_third_party,
-    security: "both",
+    security: "auth_token",
     schema: {
       body: {
         third_party_token: {
           required: true,
           type: "string",
-        },
-        platform_uri: {
-          type: "string",
-          required: true,
         },
         session_token: {
           type: "string",
@@ -294,7 +290,7 @@ const routes = {
   // Platforms
   transfer_platform: {
     handler: transfer_platform,
-    security: "both",
+    security: "auth_token",
     schema: {
       body: {
         recipient: {
@@ -307,7 +303,7 @@ const routes = {
 
   delete_transfer: {
     handler: delete_transfer,
-    security: "both",
+    security: "auth_token",
   },
 
   accept_transfer: {
