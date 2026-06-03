@@ -343,10 +343,10 @@ const update_profile_password = async (req, res) => {
           profile_data.firstname || profile_data.lastname
             ? `${profile_data.firstname} ${profile_data.lastname}`.trim()
             : "There",
-        brand_name: platform_data.fullname,
+        brand_name: platform_data?.fullname,
       },
       "password_reset:branded_successful",
-      platform_data.fullname,
+      platform_data?.fullname,
     );
   }
 
