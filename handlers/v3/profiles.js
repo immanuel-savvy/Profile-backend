@@ -219,11 +219,25 @@ const signup = async (req) => {
     profile: profile_type,
     platform: platform._id,
     ...details,
-    created: new Date(),
+    created: Date.now(),
   };
 
   let signup_settings = settings?.[profile_type]?.signup;
   let two_fa_settings = signup_settings?.two_fa_settings;
+  if (!two_fa_settings) {
+    two_fa_settings = {
+      enabled: true,
+      two_factor_auth: {
+        type: "otp",
+        otp: {
+          length: 6,
+          charset: "alnum",
+          expiry: 5,
+          template: "signup",
+        },
+      },
+    };
+  }
 
   if (two_fa_settings?.enabled) {
     let continuation = await two_fa_challenge({
@@ -583,7 +597,7 @@ const update_profile = async (req) => {
 
   let identity_settings = settings?.identity;
 
-  const protected_fields = ["_id", "profile", "platform", "created"];
+  const protected_fields = ["_id", "profile", "agent", "platform", "created"];
 
   const unique_fields = identity_settings?.uniques || [];
 
@@ -654,7 +668,7 @@ const update_profile_identity = async (req) => {
   }
 
   // Remove forbidden fields so callers cannot change core identifiers
-  const forbiddenFields = ["_id", "profile", "platform"];
+  const forbiddenFields = ["_id", "profile", "agent", "created", "platform"];
   for (const f of forbiddenFields) {
     if (Object.prototype.hasOwnProperty.call(identity, f)) {
       delete identity[f];

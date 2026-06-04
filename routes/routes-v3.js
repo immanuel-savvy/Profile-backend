@@ -10,9 +10,12 @@ import {
   update_platform,
 } from "../handlers/v3/platforms.js";
 import {
+  add_profile,
   create_profile_type,
+  edit_profile,
   get_profile_type,
   get_profile_types,
+  get_profiles,
   update_profile_type,
 } from "../handlers/v3/profile_types.js";
 import {
@@ -483,6 +486,48 @@ const routes = {
           required: true,
           type: "object",
         },
+      },
+    },
+  },
+  get_profiles: {
+    handler: get_profiles,
+    security: "api_key",
+    schema: {
+      body: {
+        profile_type: {
+          required: true,
+          type: "string",
+        },
+        limit: {
+          type: "number",
+          default_value: 20,
+        },
+        page: {
+          type: "number",
+          default_value: 1,
+        },
+      },
+    },
+  },
+  add_profile: {
+    handler: add_profile,
+    security: "api_key",
+    schema: {
+      body: {
+        details: { type: "object", required: true },
+        profile_type: { type: "string", required: true },
+        password: { type: "string", required: true },
+      },
+    },
+  },
+  edit_profile: {
+    handler: edit_profile,
+    security: "api_key",
+    schema: {
+      body: {
+        update: { type: "object", required: true },
+        profile_type: { type: "string", required: true },
+        profile_id: { type: "string", required: true },
       },
     },
   },

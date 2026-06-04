@@ -210,9 +210,9 @@ const two_fa_challenge = async ({
           db,
           identity: identity_settings.uniques.map((field) => profile[field]),
           sub: otp_sub,
-          length: two_fa_settings.two_factor_auth.otp?.length,
-          expiry: two_fa_settings.two_factor_auth.otp?.expiry,
-          charset_type: two_fa_settings.two_factor_auth.otp?.charset,
+          length: two_fa_settings.two_factor_auth.otp?.length || 6,
+          expiry: two_fa_settings.two_factor_auth.otp?.expiry || 5,
+          charset_type: two_fa_settings.two_factor_auth.otp?.charset || "alnum",
         });
 
         if (identity_settings.uniques.includes("email")) {
