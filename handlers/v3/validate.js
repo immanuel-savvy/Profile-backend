@@ -44,7 +44,6 @@ const me = async (req) => {
     };
   } else authorization = authorization.replace("Bearer ", "");
 
-  console.log(authorization, x_platform);
   let Sessions = await db.folder("Sessions");
   let session = await Sessions.findOne({
     token: authorization,

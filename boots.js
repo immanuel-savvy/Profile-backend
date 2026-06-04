@@ -11,19 +11,7 @@ const boots = async () => {
     db_name: "v3-profiles",
   });
 
-  // let Cache = await db.collection(`$CACHE-auth`);
-  // let cache = await Cache.find().toArray();
-  // console.log(JSON.stringify(cache));
-
-  // await Cache.deleteMany();
-  // return;
   let Profiles = await db.collection("Profiles");
-
-  // let exist = await Profiles.findOne();
-  // if (exist) {
-  //   console.log(exist);
-  //   return;
-  // }
 
   let profiles = [
     {

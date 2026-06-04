@@ -1,7 +1,9 @@
 import crypto from "crypto";
-import { create_session_object, get_platform_profile } from "./profiles.js";
-import { get_settings } from "./utils.js";
-import pagination from "../../utils/pagination.js";
+import {
+  create_session_object,
+  get_platform_profile,
+} from "./helpers/profiles.js";
+import { get_settings } from "./helpers/settings.js";
 
 /**
  * =========================================================
