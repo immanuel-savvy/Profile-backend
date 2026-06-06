@@ -260,7 +260,6 @@ const authorise_third_party = async (req) => {
   let { db, headers, body } = req;
 
   let { platform, profile } = headers;
-  console.log(platform, profile, "HEADERS OF AUTHORISE THIRD PARTY");
 
   let { third_party_token, session_token } = body;
 
@@ -294,11 +293,6 @@ const authorise_third_party = async (req) => {
 
   let Sessions = await db.folder("Sessions");
 
-  console.log(
-    session_token,
-    integration_platform,
-    "SESSION TOKEN AND INTEGRATION PLATFORM",
-  );
   let session = await Sessions.findOne({
     token: session_token,
     platform_uri: integration_platform.uri,

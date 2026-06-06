@@ -46,6 +46,11 @@ import {
   third_party_signup,
 } from "../handlers/v3/third_party.js";
 import { me, third_party_me, validate } from "../handlers/v3/validate.js";
+import {
+  disable_webhook,
+  enable_webhook,
+  update_webhook,
+} from "../handlers/v3/webhooks.js";
 
 // 🔑 Route map (KV store)
 const routes = {
@@ -704,6 +709,25 @@ const routes = {
         },
       },
     },
+  },
+
+  // Webhooks
+  update_webhook: {
+    handler: update_webhook,
+    security: "api_key",
+    schema: {
+      body: {
+        webhook: { type: "object", required: true },
+      },
+    },
+  },
+  enable_webhook: {
+    handler: enable_webhook,
+    security: "api_key",
+  },
+  disable_webhook: {
+    handler: disable_webhook,
+    security: "api_key",
   },
 };
 

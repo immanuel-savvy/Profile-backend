@@ -146,12 +146,7 @@ const third_party_me = async (req) => {
   let platform = await Platforms.findOne({
     uri: session.platform_uri,
   });
-
-  let Third_party_platforms = await db.folder("Third_party_platforms");
-  let third = await Third_party_platforms.findOne({
-    owner_platform: platform._id,
-    uri: xplatform,
-  });
+  let third_party_platform = await Platforms.findOne({ uri: from });
 
   return {
     ok: true,
@@ -159,8 +154,7 @@ const third_party_me = async (req) => {
     data: {
       profile,
       platform: platform,
-      third_party: third,
-      xplatform: platform,
+      xplatform: third_party_platform,
     },
   };
 };
