@@ -47,8 +47,11 @@ import {
 } from "../handlers/v3/third_party.js";
 import { me, third_party_me, validate } from "../handlers/v3/validate.js";
 import {
+  disable_platform_webhook,
   disable_webhook,
+  enable_platform_webhook,
   enable_webhook,
+  update_platform_webhook,
   update_webhook,
 } from "../handlers/v3/webhooks.js";
 
@@ -728,6 +731,30 @@ const routes = {
   disable_webhook: {
     handler: disable_webhook,
     security: "api_key",
+  },
+  disable_platform_webhook: {
+    handler: disable_platform_webhook,
+    security: "api_key",
+    schema: {
+      body: { token: { required: true, type: "string" } },
+    },
+  },
+  enable_platform_webhook: {
+    handler: enable_platform_webhook,
+    security: "api_key",
+    schema: {
+      body: { token: { required: true, type: "string" } },
+    },
+  },
+  update_platform_webhook: {
+    handler: update_platform_webhook,
+    security: "api_key",
+    schema: {
+      body: {
+        webhook: { type: "object", required: true },
+        token: { type: "string", required: true },
+      },
+    },
   },
 };
 
