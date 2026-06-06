@@ -148,12 +148,19 @@ const third_party_me = async (req) => {
   });
   let third_party_platform = await Platforms.findOne({ uri: from });
 
+  let Third_party_platforms = await db.folder("Third_party_platforms");
+  let third_party = await Third_party_platforms.findOne({
+    uri: from,
+    owner_platform: platform._id,
+  });
+
   return {
     ok: true,
     message: "Session valid",
     data: {
       profile,
       platform: platform,
+      third_party,
       xplatform: third_party_platform,
     },
   };
