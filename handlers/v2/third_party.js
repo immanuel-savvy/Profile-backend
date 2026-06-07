@@ -1,6 +1,11 @@
 import { Platform_profile_type_id } from "./platform.js";
 import { create_profile, retrieve_setting, signin_user } from "./profiles.js";
-import crypto, { createHash, randomBytes, createCipheriv } from "crypto";
+import crypto, {
+  createHash,
+  randomBytes,
+  createCipheriv,
+  createDecipheriv,
+} from "crypto";
 import debug from "../../utils/debug.js";
 
 const deriveKey = (secret) =>

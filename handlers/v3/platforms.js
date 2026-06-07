@@ -1,5 +1,6 @@
 import { Profile_profile_id } from "../../boots.js";
 import { Platform_profile_type_id } from "../v2/platform.js";
+import { create_profile_type } from "./profile_types.js";
 import { get_platform_profile } from "./profiles.js";
 import crypto from "crypto";
 
@@ -39,11 +40,21 @@ const new_platform = async (req) => {
     created: Date.now(),
   });
 
+  let res = await create_profile_type({
+    ...req,
+    headers: { platform },
+    body: {
+      name,
+      type: "user",
+      description: "Base profile for carrying out platform activities",
+    },
+  });
+
   return {
     ok: true,
     message: "Platform created",
     token,
-    data: platform,
+    data: { platform, profile_type: res?.ok ? res.data : res.message },
   };
 };
 

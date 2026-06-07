@@ -44,6 +44,7 @@ import {
   third_party_profile,
   third_party_signin,
   third_party_signup,
+  update_third_party_permissions,
 } from "../handlers/v3/third_party.js";
 import { me, third_party_me, validate } from "../handlers/v3/validate.js";
 import {
@@ -226,6 +227,22 @@ const routes = {
         },
         profile_types: {
           type: "array",
+          required: true,
+        },
+      },
+    },
+  },
+  update_third_party_permissions: {
+    handler: update_third_party_permissions,
+    security: "api_key",
+    schema: {
+      body: {
+        token: {
+          type: "string",
+          required: true,
+        },
+        permissions: {
+          type: "object",
           required: true,
         },
       },

@@ -21,7 +21,8 @@ import { get_settings } from "./helpers/settings.js";
  * =========================================================
  */
 
-const register_third_party = async (req) => {
+const register_third_party = async (req, opts = {}) => {
+  let { target_platform, by } = opts || {};
   let { db, headers, body } = req;
 
   let { platform } = headers;
@@ -51,7 +52,7 @@ const register_third_party = async (req) => {
 
   let Platforms = await db.folder("Platforms");
 
-  let target_platform = await Platforms.findOne({ uri });
+  target_platform = !target_platform && (await Platforms.findOne({ uri }));
 
   if (!target_platform) {
     return {
@@ -70,7 +71,9 @@ const register_third_party = async (req) => {
 
     profile_types,
 
-    uri: uri || null,
+    uri,
+
+    target_platform: target_platform._id,
 
     permissions,
 
@@ -81,11 +84,31 @@ const register_third_party = async (req) => {
     created: Date.now(),
   };
 
+  if (by) third_party.by = by;
+
   await Third_party.insertOne(third_party);
+
+  let permitting = new Array();
+  for (let t_uri in permissions) {
+    let t_platform = await Platforms.findOne({ t_uri });
+
+    let res = await register_third_party(
+      {
+        ...req,
+        headers: { platform: t_platform },
+        body: {
+          uri,
+          profile_types,
+          permissions: {},
+        },
+      },
+      { target_platform, by: t_platform._id },
+    );
+    if (res.ok) permitting.push(res.data);
+  }
 
   return {
     ok: true,
-    status: 201,
     message: "Third party registered",
     data: {
       _id: third_party._id,
@@ -94,6 +117,7 @@ const register_third_party = async (req) => {
       profile_types,
 
       permissions,
+      permitting,
     },
   };
 };
@@ -818,11 +842,70 @@ const third_party_profile = async (req) => {
   };
 };
 
+const update_third_party_permissions = async (req) => {
+  let { db, headers, body } = req;
+
+  let { platform } = headers;
+
+  let { token, permissions = {} } = body;
+
+  let Third_party_platforms = await db.folder("Third_party_platforms");
+
+  let third_party = await Third_party_platforms.findOne({
+    owner_platform: platform._id,
+    api_key: token,
+  });
+
+  if (!third_party) {
+    return {
+      ok: false,
+      message: "Invalid creds",
+      status: 403,
+    };
+  }
+
+  await Third_party_platforms.updateOne(
+    { _id: third_party._id },
+    { $set: { permissions: { ...third_party.permissions, ...permissions } } },
+  );
+
+  let Platforms = await db.folder("Platforms");
+  let target_platform = await Platforms.findOne({
+    _id: third_party.target_platform,
+  });
+
+  let permitting = new Array();
+  for (let uri in permissions) {
+    let t_platform = await Platforms.findOne({ uri });
+
+    let res = await register_third_party(
+      {
+        ...req,
+        headers: { platform: t_platform },
+        body: {
+          uri: target_platform.uri,
+          profile_types: third_party.profile_types,
+        },
+      },
+      { target_platform },
+    );
+
+    res.ok && permitting.push(res.data);
+  }
+
+  return {
+    ok: true,
+    message: "Updated third party permissions",
+    data: { permitting, profile_types: third_party.profile_types, permissions },
+  };
+};
+
 export {
   register_third_party,
   authorise_third_party,
   refresh_third_party_token,
   get_token,
+  update_third_party_permissions,
   third_party_profile,
   third_party_signin,
   get_third_parties_by_uri,
