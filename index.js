@@ -4,7 +4,7 @@ import http from "http";
 import { boots } from "./boots.js";
 import { createVerification } from "./services/email.js";
 import { checkVerification } from "./handlers/v1/profile.js";
-import { USERS } from "./ds/folders.js";
+import { PROFILES, USERS } from "./ds/folders.js";
 
 let server = http.createServer(handler);
 
@@ -15,6 +15,14 @@ server.listen(port, async () => {
   // console.log(await checkVerification("9829", "+2347064704080"));
   // console.log(crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID());
   // await boots();
+
+  console.log(
+    JSON.stringify(
+      await (await PROFILES()).findOne({ phone: "2347064704080" }),
+      null,
+      2,
+    ),
+  );
 
   console.log(`Profile API is listening on http://localhost:${port}`);
 });

@@ -52,7 +52,7 @@ const register_third_party = async (req, opts = {}) => {
 
   let Platforms = await db.folder("Platforms");
 
-  target_platform = !target_platform && (await Platforms.findOne({ uri }));
+  target_platform = target_platform || (await Platforms.findOne({ uri }));
 
   if (!target_platform) {
     return {
@@ -90,7 +90,7 @@ const register_third_party = async (req, opts = {}) => {
 
   let permitting = new Array();
   for (let t_uri in permissions) {
-    let t_platform = await Platforms.findOne({ t_uri });
+    let t_platform = await Platforms.findOne({ uri: t_uri });
 
     let res = await register_third_party(
       {
@@ -102,7 +102,7 @@ const register_third_party = async (req, opts = {}) => {
           permissions: {},
         },
       },
-      { target_platform, by: t_platform._id },
+      { target_platform, by: platform._id },
     );
     if (res.ok) permitting.push(res.data);
   }
@@ -190,12 +190,40 @@ const get_third_party_registrations = async (req) => {
 const get_third_party = async (req) => {
   let { headers, body, db } = req;
   let { platform } = headers;
-  let { token, owner_uri } = body;
+  let { token } = body;
 
   let Third_party_platforms = await db.folder("Third_party_platforms");
 
   let query = { uri: platform.uri };
   if (token) query.token = token;
+
+  let data = await Third_party_platforms.findOne(query);
+
+  return {
+    ok: !!data,
+    data,
+    message: data ? "Retrieved" : "Not found",
+    response_code: data ? "retrieved" : "not_found",
+  };
+};
+
+const get_third_party_by_owner_uri = async (req) => {
+  let { headers, body, db } = req;
+  let { platform } = headers;
+  let { owner_uri } = body;
+
+  let Third_party_platforms = await db.folder("Third_party_platforms");
+  let Platforms = await db.folder("Platforms");
+  let owner_platform = await Platforms.findOne({ uri: owner_uri });
+  if (!owner_platform) {
+    return {
+      ok: false,
+      message: "Owner platform not found",
+      status: 400,
+    };
+  }
+
+  let query = { uri: platform.uri, owner_platform: owner_platform._id };
 
   let data = await Third_party_platforms.findOne(query);
 
@@ -887,10 +915,10 @@ const update_third_party_permissions = async (req) => {
           profile_types: third_party.profile_types,
         },
       },
-      { target_platform },
+      { target_platform, by: platform._id },
     );
 
-    res.ok && permitting.push(res.data);
+    permitting.push(res);
   }
 
   return {
@@ -917,4 +945,5 @@ export {
   get_third_party_registrations,
   get_third_party_registration,
   get_third_party_registrations_by_uri,
+  get_third_party_by_owner_uri,
 };

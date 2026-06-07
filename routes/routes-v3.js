@@ -35,6 +35,7 @@ import {
   get_third_parties,
   get_third_parties_by_uri,
   get_third_party,
+  get_third_party_by_owner_uri,
   get_third_party_registration,
   get_third_party_registrations,
   get_third_party_registrations_by_uri,
@@ -243,6 +244,18 @@ const routes = {
         },
         permissions: {
           type: "object",
+          required: true,
+        },
+      },
+    },
+  },
+  get_third_party_by_owner_uri: {
+    handler: get_third_party_by_owner_uri,
+    security: "api_key",
+    schema: {
+      body: {
+        owner_uri: {
+          type: "string",
           required: true,
         },
       },

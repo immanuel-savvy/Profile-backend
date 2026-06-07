@@ -478,10 +478,11 @@ const signin = async (req, res) => {
 
   if (email) email = email.trim().toLowerCase();
 
-  let profile = await Profiles.findOne({
+  let query = {
     profile: profile_id,
     $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
-  });
+  };
+  let profile = await Profiles.findOne(query);
 
   if (!profile) {
     return res.json({
