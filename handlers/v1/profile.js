@@ -582,6 +582,7 @@ const resend_profile_otp = async (req, res) => {
 
   let response;
 
+  console.log(verification_means, "in here....");
   if (verification_means === "phone") {
     response = await send_message_otp(phone, {
       platform,

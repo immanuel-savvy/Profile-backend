@@ -36,7 +36,6 @@ async function createVerification(phone) {
         to: phone,
       });
 
-    console.log(verification);
     return verification;
   } catch (err) {
     return;
@@ -55,7 +54,7 @@ const send_message_otp = async (phone, { platform, profile_type }) => {
 
   let platfom = await (await USERS()).findOne({ _id: platform });
 
-  if (profile_type === HG_profile_id) {
+  if (profile_type?._id === HG_profile_id) {
     const StoreOtp = await STORE_OTP(true);
     const otpId = crypto.randomUUID();
     await StoreOtp.updateOne(
