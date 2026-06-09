@@ -1,4 +1,6 @@
+import { hash } from "../../../utils/hash.js";
 import { get_settings } from "./settings.js";
+import crypto from "crypto";
 
 const get_platform_profile = async (req, platform) => {
   let { db } = req;
@@ -6,7 +8,7 @@ const get_platform_profile = async (req, platform) => {
 
   let res = await (
     await db.folder("Profiles")
-  ).findOne({ profile: platform?._id });
+  ).findOne({ _id: platform?.profile });
 
   return res;
 };
@@ -20,29 +22,35 @@ const generate_otp = async ({
   sub = "general",
 }) => {
   let otp = "";
-  let folder = await db.folder(`Otps:${sub}`);
+
+  const folder = await db.folder(`Otps:${sub}`);
+
   if (!Array.isArray(identity)) {
     identity = [identity];
   }
 
-  // Define character sets
   const charsets = {
     num: "0123456789",
-    alpha: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
-    alnum: "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    alpha: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    alnum: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     hex: "0123456789abcdef",
   };
 
-  const chars = charsets[charset_type] || charsets["num"];
+  const chars = charsets[charset_type] || charsets.num;
 
-  // Generate OTP using crypto for secure randomness
+  // SECURE RANDOM OTP
   for (let i = 0; i < length; i++) {
-    const idx = crypto.randomInt(0, chars.length);
+    const bytes = new Uint8Array(1);
+
+    crypto.getRandomValues(bytes);
+
+    const idx = bytes[0] % chars.length;
+
     otp += chars[idx];
   }
 
-  // Prepare document fields
   const now = new Date();
+
   const expires_at = new Date(now.getTime() + expiry * 60 * 1000);
 
   const doc = {
@@ -53,24 +61,42 @@ const generate_otp = async ({
     expires_at,
   };
 
-  // If an OTP already exists for any of these identities, reuse its _id so callers
-  // can get the real document id after the upsert. Otherwise the generated doc._id
-  // will be used for the insert.
-  const existing = await folder.findOne({ identity: { $in: identity } });
-  if (existing && existing._id) {
+  // Match SAME identity set
+  const existing = await folder.findOne({
+    identity: { $all: identity },
+  });
+
+  if (existing?._id) {
     doc._id = existing._id;
   }
+
   await folder.updateOne(
-    { identity: { $in: identity } },
     {
-      $set: { key: doc.key, expires_at: doc.expires_at },
-      $setOnInsert: doc,
+      identity: { $all: identity },
     },
-    { upsert: true },
+    {
+      $set: {
+        key: doc.key,
+        expires_at: doc.expires_at,
+      },
+      $setOnInsert: {
+        _id: doc._id,
+        identity: doc.identity,
+        created: doc.created,
+      },
+    },
+    {
+      upsert: true,
+    },
   );
 
-  // Return plain OTP so caller can send it to user, and the id to reference it
-  return { ok: true, _id: doc._id, identity, otp, expires_at };
+  return {
+    ok: true,
+    _id: doc._id,
+    identity,
+    otp,
+    expires_at,
+  };
 };
 
 const create_session_object = async (profile, platform, req, options) => {
@@ -112,25 +138,29 @@ const create_session_object = async (profile, platform, req, options) => {
     if (!session_settings) {
       let settings = await get_settings({
         req,
-        body: { category: [profile.profile], key: ["sessions"] },
+        body: { category: [profile.profile], key: ["session"] },
       });
 
-      session_settings = settings?.sessions;
+      session_settings = settings?.session;
     }
 
-    if (session_settings?.notify?.enabled) {
-      await req.services("aimail").call(
+    if (session_settings?.notification?.enabled) {
+      await (
+        await req.services("aimail")
+      ).call(
         "send_mail",
         {
           to: profile.email,
+          from: platform.name,
           content: {
             template:
-              session_settings.notify?.template ||
+              session_settings.notification?.template ||
               template ||
               "signin-notification",
             params: {
               profile,
-              device: meta_payload?.device,
+              device: meta_payload?.device || "-",
+              platform,
               datetime: {
                 date: new Date().toDateString(),
                 time: new Date().toTimeString(),
@@ -138,7 +168,7 @@ const create_session_object = async (profile, platform, req, options) => {
             },
           },
         },
-        { profile: await get_platform_profile(req, platform) },
+        { profile: platform.profile },
       );
     }
   }
@@ -158,8 +188,11 @@ const validate_continuation = async (db, continuation_token, props) => {
     let otp_folder = await db.folder(`Otps:${sub}`);
     let otp_entry = await otp_folder.findOne({ _id: continuation_token });
 
-    if (!otp_entry || otp_entry.expires_at < new Date()) {
-      return { ok: false, status: 400, message: "OTP expired or invalid" };
+    if (!otp_entry) {
+      return { ok: false, message: "Invalid Token" };
+    }
+    if (otp_entry.expires_at < new Date()) {
+      return { ok: false, status: 400, message: "OTP expired" };
     }
 
     if (otp_entry.key !== hash(otp)) {
@@ -173,8 +206,11 @@ const validate_continuation = async (db, continuation_token, props) => {
       type: sub,
     });
 
-    if (!token_entry || token_entry.expires_at < new Date()) {
-      return { ok: false, status: 400, message: "Token expired or invalid" };
+    if (!token_entry) {
+      return { ok: false, status: 400, message: "Token invalid" };
+    }
+    if (token_entry.expires_at < new Date()) {
+      return { ok: false, status: 400, message: "Token expired" };
     }
     if (token_entry.type !== "signin") {
       return { ok: false, status: 400, message: "Invalid token type" };
@@ -196,14 +232,18 @@ const two_fa_challenge = async ({
   two_fa_settings,
   identity_settings,
   platform,
+  profile_type,
   meta_payload,
   otp_sub,
   template = {},
 }) => {
   let { db } = req;
 
+  console.log(JSON.stringify(two_fa_settings, null, 2));
   if (two_fa_settings) {
-    let signin_response, continuation;
+    let signin_response,
+      continuation,
+      delivery = 2;
     if (two_fa_settings?.enabled) {
       if (two_fa_settings.two_factor_auth?.type === "otp") {
         continuation = await generate_otp({
@@ -215,43 +255,64 @@ const two_fa_challenge = async ({
           charset_type: two_fa_settings.two_factor_auth.otp?.charset || "alnum",
         });
 
+        console.log(continuation);
         if (identity_settings.uniques.includes("email")) {
-          signin_response = await req.services("aimail").call(
+          console.log("email?");
+          signin_response = await (
+            await req.services("aimail")
+          ).call(
             "send_mail",
             {
               to: profile.email,
+              from: platform.name,
               content: {
                 template:
                   two_fa_settings.two_factor_auth.otp?.template || template.otp,
                 params: {
-                  otp: otp_res.otp,
-                  expiry: Math.ceil((otp_res.expires_at - new Date()) / 60000),
+                  otp: continuation.otp,
+                  expiry: Math.ceil(
+                    (continuation.expires_at - new Date()) / 60000,
+                  ),
                   profile,
+                  platform,
+                  profile_type,
                 },
               },
             },
-            { profile: await get_platform_profile(req, platform) },
+            { profile: platform.profile },
           );
-
-          if (!signin_response.ok) signin_response = null;
         }
-        if (!signin_response && identity_settings.uniques.includes("phone")) {
-          signin_response = await req.services("aimail").call(
-            "send_message",
-            {
-              to: profile.phone,
-              content: {
-                template:
-                  two_fa_settings.two_factor_auth.otp?.template || template.otp,
-                params: {
-                  otp: otp_res.otp,
-                  expiry: Math.ceil((otp_res.expires_at - new Date()) / 60000),
-                  profile,
+        if (!signin_response?.ok) {
+          if (identity_settings.uniques.includes("phone") && profile.phone) {
+            signin_response = await (
+              await req.services("aimail")
+            ).call(
+              "send_message",
+              {
+                to: profile.phone,
+                from: platform.name,
+                content: {
+                  template:
+                    two_fa_settings.two_factor_auth.otp?.template ||
+                    template.otp,
+                  params: {
+                    otp: continuation.otp,
+                    expiry: Math.ceil(
+                      (continuation.expires_at - new Date()) / 60000,
+                    ),
+                    profile,
+                    platform,
+                    profile_type,
+                  },
                 },
               },
-            },
-            { profile: await get_platform_profile(req, platform) },
-          );
+              { profile: platform.profile },
+            );
+
+            if (!signin_response?.ok) {
+              return signin_response;
+            }
+          } else return signin_response;
         }
       } else if (two_fa_settings.two_factor_auth?.type === "link") {
         let Reset_tokens = await db.folder("Reset_tokens");
@@ -266,57 +327,85 @@ const two_fa_challenge = async ({
         };
         await Reset_tokens.insertOne(continuation);
 
-        if (identity_settings.uniques.includes("email")) {
-          signin_response = await req.services("aimail").call(
+        if (identity_settings?.uniques?.includes("email")) {
+          signin_response = await (
+            await req.services("aimail")
+          ).call(
             "send_mail",
             {
               to: profile.email,
+              from: platform.name,
               content: {
                 template:
                   two_fa_settings.two_factor_auth.link?.template ||
                   template.link,
                 params: {
                   link: `${two_fa_settings.two_factor_auth.link.url}?token=${token}`,
+                  expiry: 5,
+                  profile_type,
+                  platform,
                   profile,
                 },
               },
             },
-            { profile: await get_platform_profile(req, platform) },
+            { profile: platform.profile },
           );
-
-          if (!signin_response.ok) signin_response = null;
         }
-        if (!signin_response && identity_settings.uniques.includes("phone")) {
-          signin_response = await req.services("aimail").call(
-            "send_message",
-            {
-              to: profile.phone,
-              content: {
-                template:
-                  two_fa_settings.two_factor_auth.link?.template ||
-                  template.link,
-                params: {
-                  link: `${two_fa_settings.two_factor_auth.link.url}?token=${token}`,
-                  profile,
+        if (!signin_response?.ok) {
+          if (identity_settings?.uniques?.includes("phone")) {
+            signin_response = await (
+              await req.services("aimail")
+            ).call(
+              "send_message",
+              {
+                to: profile.phone,
+                from: platform.name,
+                content: {
+                  template:
+                    two_fa_settings.two_factor_auth.link?.template ||
+                    template.link,
+                  params: {
+                    link: `${two_fa_settings.two_factor_auth.link.url}?token=${token}`,
+                    expiry: 5,
+                    platform,
+                    profile_type,
+                    profile,
+                  },
                 },
               },
-            },
-            { profile: await get_platform_profile(req, platform) },
-          );
+              { profile: platform.profile },
+            );
+
+            if (!signin_response?.ok) return signin_response;
+          } else return signin_response;
         }
       }
 
       let continuation_db = await db.folder("2fa_continuations");
-      await continuation_db.insertOne({
-        _id: continuation._id,
-        profile: profile._id,
-        type: two_fa_settings.two_factor_auth?.type,
-        data: signin_response,
-        created: Date.now(),
-        meta_payload,
-      });
 
+      await continuation_db.updateOne(
+        {
+          _id: continuation._id,
+        },
+        {
+          $set: {
+            profile: profile._id,
+            type: two_fa_settings.two_factor_auth?.type,
+            data: signin_response,
+            meta_payload,
+          },
+
+          $setOnInsert: {
+            _id: continuation._id,
+            created: Date.now(),
+          },
+        },
+        {
+          upsert: true,
+        },
+      );
       return {
+        ok: true,
         continuation_id: continuation?._id,
         type: two_fa_settings.two_factor_auth?.type,
         data: signin_response,

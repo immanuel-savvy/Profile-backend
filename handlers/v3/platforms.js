@@ -208,7 +208,9 @@ const add_permissions = async (req) => {
   let { platform } = headers;
   let { permissions } = body;
 
-  let res = await req.services("settings").call(
+  let res = await (
+    await req.services("settings")
+  ).call(
     "add_setting",
     {
       category: platform._id,
@@ -274,9 +276,12 @@ const transfer_platform = async (req) => {
     _id: crypto.randomUUID(),
   });
 
-  await req.services("aimail").call(
+  await (
+    await req.services("aimail")
+  ).call(
     "send_mail",
     {
+      from: platform.name,
       to: recipient.email,
       content: {
         template: "platform_transfer",
@@ -373,9 +378,10 @@ const accept_transfer = async (req) => {
     await db.folder("Profiles")
   ).findOne({ _id: platform.profile });
 
-  let aimail = req.services("aimail");
+  let aimail = await req.services("aimail");
   await aimail.call("send_mail", {
     to: profile.email,
+    from: platform.name,
     content: {
       template: "platform_transfer_accepted",
       params: {
@@ -388,6 +394,7 @@ const accept_transfer = async (req) => {
 
   await aimail.call("send_mail", {
     to: from.email,
+    from: platform.name,
     content: {
       template: "transfer_accepted",
       params: {

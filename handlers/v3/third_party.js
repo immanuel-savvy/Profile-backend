@@ -398,6 +398,7 @@ const get_token = async (req) => {
 
   let { profile, platform_uri } = body;
 
+  console.log(body, platform, "in here...");
   let Sessions = await db.folder("Sessions");
 
   let session = await Sessions.findOne({
@@ -500,6 +501,8 @@ const third_party_signin = async (req, opt) => {
     session_token,
     profile_type,
     allow_signup,
+
+    // from $third_party_signup
     allow_signin,
   } = body;
 
@@ -556,12 +559,12 @@ const third_party_signin = async (req, opt) => {
   let settings = await get_settings({
     req,
     body: {
-      category: profile_type,
+      category: [platform._id],
       key: setting_keys,
     },
   });
 
-  let identity_settings = settings?.[profile_type]?.identity;
+  let identity_settings = settings?.identity;
   if (!identity_settings) {
     identity_settings = {
       uniques: ["email"],
@@ -601,7 +604,7 @@ const third_party_signin = async (req, opt) => {
   }
 
   let response = await create_session_object(profile, platform, req, {
-    session_settings: settings?.[profile_type]?.session,
+    session_settings: settings?.session,
     by: session_platform.uri,
   });
 
@@ -635,7 +638,7 @@ const third_party_signup = async (req) => {
     let { payload } = req;
     let { settings, session_platform, session_profile } = payload;
 
-    let identity_settings = settings?.[profile_type]?.identity;
+    let identity_settings = settings?.identity;
     if (!identity_settings) {
       identity_settings = {
         uniques: ["email"],
@@ -698,8 +701,9 @@ const third_party_signup = async (req) => {
     });
 
     let welcome_notification = settings?.signup?.notification;
-    if (new_profile.email) {
+    if (welcome_notification?.enabled && new_profile.email) {
       await req.services("aimail").call("send_mail", {
+        from: platform.name,
         to: new_profile.email,
         content: {
           template: welcome_notification?.template || "welcome",
@@ -787,7 +791,7 @@ const get_permissions = async (req) => {
   let permissions = get_settings({
     req,
     body: {
-      category: profile.platform,
+      category: [profile.platform],
       key: "permissions",
     },
     profile: await get_platform_profile(req, { _id: profile.platform }),

@@ -13,6 +13,9 @@ const boots = async () => {
 
   let Profiles = await db.collection("Profiles");
 
+  return console.log(
+    await Profiles.deleteOne({ _id: "13720939-74c5-48aa-a0c1-2ec03f8629dc" }),
+  );
   let profiles = [
     {
       fullname: "Immanuel Savvy",

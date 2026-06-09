@@ -10,10 +10,10 @@ const services = {
   },
   aimail: {
     url: DEV
-      ? "http://localhost:4002"
+      ? "http://localhost:4003"
       : "https://email-api.savvyaisolution.com",
     uri: "aimail.savvyaisolution.com",
-    api_version: "v2",
+    api_version: "v3",
   },
 };
 

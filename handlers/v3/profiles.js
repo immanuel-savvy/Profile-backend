@@ -13,19 +13,21 @@ const signin = async (req) => {
   let { platform } = req.headers;
   const { credentials, profile_type, meta_payload } = req.body;
 
-  console.log(credentials, profile_type);
   let Profile_types = await db.folder("Profile_types");
-  let profile_type_entry = await Profile_types.findOne({ _id: profile_type });
+  let profile_type_entry = await Profile_types.findOne({
+    _id: profile_type,
+    platform: platform._id,
+  });
 
   if (!profile_type_entry) {
     return { ok: false, status: 400, message: "Invalid profile type" };
   }
 
   // Get platform identity settings
-  // The shape is: { identity: { [profile_type]: { uniques: [ "email" ] } } }
+  // The shape is: { identity:  { uniques: [ "email" ] } }
   let settings = await get_settings({
     req,
-    body: { category: [profile_type], key: ["identity", "signin"] },
+    body: { category: [platform._id], key: ["identity", "signin", "session"] },
   });
 
   console.log(settings);
@@ -34,11 +36,9 @@ const signin = async (req) => {
   if (!identity_settings) {
     // Default to email if not specified
     identity_settings = {
-      [profile_type]: {
-        uniques: ["email"],
-      },
-    }[profile_type];
-  } else identity_settings = identity_settings[profile_type];
+      uniques: ["email"],
+    };
+  }
 
   const Profiles = await db.folder("Profiles");
 
@@ -72,14 +72,15 @@ const signin = async (req) => {
     return { ok: false, status: 401, message: "Incorrect password" };
   }
 
-  let signin_settings = settings?.signin?.[profile_type];
+  let signin_settings = settings?.signin;
 
-  if (signin_settings?.enabled) {
+  if (signin_settings?.two_fa_settings?.enabled) {
     let res = await two_fa_challenge({
       req,
       profile,
-      two_fa_settings: signin_settings,
+      two_fa_settings: signin_settings?.two_fa_settings,
       platform,
+      profile_type: profile_type_entry,
       identity_settings,
       meta_payload,
       otp_sub: `${profile_type}_signin`,
@@ -106,6 +107,7 @@ const signin = async (req) => {
 
   let session_object = await create_session_object(profile, platform, req, {
     meta_payload,
+    session_settings: settings?.session,
   });
 
   return {
@@ -161,21 +163,31 @@ const signup = async (req) => {
 
   let { details, profile_type, password } = body;
 
+  let profile_type_entry = await (
+    await db.folder("Profile_types")
+  ).findOne({ _id: profile_type, platform: platform._id });
+  if (!profile_type_entry) {
+    return {
+      ok: false,
+      message: "Profile type not found",
+      status: 404,
+    };
+  }
+
   let settings = await get_settings({
     req,
-    body: { category: [profile_type], key: ["identity", "signup"] },
+    body: { category: [platform._id], key: ["identity", "signup"] },
   });
 
-  let identity_settings = settings?.[profile_type]?.identity;
+  console.log(settings);
+
+  let identity_settings = settings?.identity;
 
   if (!identity_settings) {
-    // Default to email if not specified
     identity_settings = {
-      [profile_type]: {
-        uniques: ["email"],
-      },
-    }[profile_type];
-  } else identity_settings = identity_settings[profile_type];
+      uniques: ["email"],
+    };
+  }
 
   let Profiles = await db.folder("Profiles");
 
@@ -222,7 +234,7 @@ const signup = async (req) => {
     created: Date.now(),
   };
 
-  let signup_settings = settings?.[profile_type]?.signup;
+  let signup_settings = settings?.signup;
   let two_fa_settings = signup_settings?.two_fa_settings;
   if (!two_fa_settings) {
     two_fa_settings = {
@@ -233,7 +245,7 @@ const signup = async (req) => {
           length: 6,
           charset: "alnum",
           expiry: 5,
-          template: "signup",
+          template: "otp-2fa-signup",
         },
       },
     };
@@ -245,6 +257,7 @@ const signup = async (req) => {
       profile: details,
       identity_settings,
       two_fa_settings,
+      profile_type: profile_type_entry,
       meta_payload: { new_profile: newProfile, password },
       platform,
       otp_sub: `${profile_type}_signup`,
@@ -254,8 +267,8 @@ const signup = async (req) => {
       },
     });
 
-    return !continuation.data.ok
-      ? continuation.data
+    return !continuation?.ok
+      ? continuation
       : {
           ok: true,
           status: 200,
@@ -263,7 +276,7 @@ const signup = async (req) => {
           data: {
             continuation_token: continuation.continuation_id,
             two_factor_auth: {
-              type: continuation.two_factor_auth?.type,
+              type: continuation?.type,
             },
           },
         };
@@ -290,7 +303,10 @@ const signup = async (req) => {
 
   let welcome_notification = signup_settings?.notification;
   if (welcome_notification?.enabled) {
-    await req.services("aimail").call("send_mail", {
+    await (
+      await req.services("aimail")
+    ).call("send_mail", {
+      from: platform.name,
       to: newProfile.email,
       content: {
         template: welcome_notification?.template,
@@ -308,8 +324,8 @@ const signup = async (req) => {
 };
 
 const two_factor_signup = async (req) => {
-  let { db, body } = req;
-
+  let { db, body, headers } = req;
+  let { platform } = headers;
   let { continuation_token, otp, token, profile_type } = body;
 
   let validate = await validate_continuation(db, continuation_token, {
@@ -330,17 +346,19 @@ const two_factor_signup = async (req) => {
   let settings = await get_settings({
     req,
     body: {
-      category: {
-        or: [profile_type, "general"],
-      },
+      category: [platform._id],
       key: ["identity", "signup"],
     },
   });
 
+  console.log(settings, "what you say?");
+
   let identity_settings = settings?.identity;
 
   if (!identity_settings) {
-    return { ok: false, status: 400, message: "Invalid profile type" };
+    identity_settings = {
+      uniques: ["email"],
+    };
   }
 
   if (
@@ -400,13 +418,26 @@ const two_factor_signup = async (req) => {
   let signup_setting = settings?.signup;
 
   if (signup_setting?.notification?.enabled) {
-    await req.services("aimail").call("send_mail", {
-      to: new_profile.email,
-      content: {
-        template: signup_setting?.template,
-        params: { profile: new_profile },
+    await (
+      await req.services("aimail")
+    ).call(
+      "send_mail",
+      {
+        from: platform.name,
+        to: new_profile.email,
+        content: {
+          template: signup_setting?.notification?.template,
+          params: {
+            profile: new_profile,
+            platform,
+            profile_type: await (
+              await db.folder("Profile_types")
+            ).findOne({ _id: new_profile.profile }),
+          },
+        },
       },
-    });
+      { profile: platform.profile },
+    );
   }
 
   return {
@@ -424,7 +455,7 @@ const forgot_password = async (req) => {
 
   let settings = await get_settings({
     req,
-    body: { category: [profile_type], key: ["identity", "forgot_password"] },
+    body: { category: [platform._id], key: ["identity", "forgot_password"] },
   });
 
   let identity_settings = settings?.identity;
@@ -463,14 +494,17 @@ const forgot_password = async (req) => {
     return { ok: false, status: 404, message: "Profile not found" };
   }
 
-  let forgot_password_settings = settings.forgot_password;
+  let forgot_password_settings = settings?.forgot_password?.two_fa_settings;
 
   if (forgot_password_settings?.enabled) {
     let res = await two_fa_challenge({
       req,
       profile,
-      two_fa_settings: forgot_password_settings.two_fa_settings,
+      two_fa_settings: forgot_password_settings,
       identity_settings,
+      profile_type: await (
+        await db.folder("Profile_types")
+      ).findOne({ _id: profile_type }),
       platform,
       meta_payload: { profile_id: profile._id },
       otp_sub: `${profile_type}_forgot_password`,
@@ -503,7 +537,8 @@ const forgot_password = async (req) => {
 };
 
 const reset_password = async (req) => {
-  let { db, body } = req;
+  let { db, body, headers } = req;
+  let { platform } = headers;
   let { continuation_token, otp, token, profile_type, new_password } = body;
 
   let validation = await validate_continuation(db, continuation_token, {
@@ -525,7 +560,7 @@ const reset_password = async (req) => {
 
   let settings = await get_settings({
     req,
-    body: { category: [profile_type], key: ["identity", "forgot_password"] },
+    body: { category: [platform._id], key: ["identity", "forgot_password"] },
   });
 
   let forgot_password_settings = settings?.forgot_password;
@@ -536,17 +571,27 @@ const reset_password = async (req) => {
       _id: continuation.meta_payload.profile_id,
     });
 
-    await req.services("aimail").call(
+    await (
+      await req.services("aimail")
+    ).call(
       "send_mail",
       {
+        from: platform.name,
         to: profile.email,
         content: {
           template:
-            forgot_password_settings.notification.template || "password_reset",
-          params: { profile },
+            forgot_password_settings.notification.template ||
+            "password_reset_successful",
+          params: {
+            profile,
+            platform,
+            profile_type: await (
+              await db.folder("Profile_types")
+            ).findOne({ _id: profile_type }),
+          },
         },
       },
-      { profile: await get_platform_profile(req) },
+      { profile: platform.profile },
     );
   }
 
@@ -610,7 +655,7 @@ const update_profile = async (req) => {
       status: 400,
       message: `Cannot update unique field(s): ${updatingUnique.join(
         ", ",
-      )}. Use /updateprofileidentity endpoint instead`,
+      )}. Use /update_profile_identity endpoint instead`,
     };
   }
 
@@ -658,14 +703,6 @@ const update_profile_identity = async (req) => {
   let { profile, platform } = headers;
 
   let { identity } = body;
-
-  if (!identity || typeof identity !== "object") {
-    return {
-      ok: false,
-      status: 400,
-      message: "Invalid identity payload",
-    };
-  }
 
   // Remove forbidden fields so callers cannot change core identifiers
   const forbiddenFields = ["_id", "profile", "agent", "created", "platform"];
@@ -754,6 +791,9 @@ const update_profile_identity = async (req) => {
       req,
       profile,
       identity_settings,
+      profile_type: await (
+        await db.folder("Profile_types")
+      ).findOne({ _id: profile.profile }),
       two_fa_settings: update_settings.two_fa_settings,
       platform,
       meta_payload: {
