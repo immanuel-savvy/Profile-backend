@@ -30,7 +30,6 @@ const signin = async (req) => {
     body: { category: [platform._id], key: ["identity", "signin", "session"] },
   });
 
-  console.log(settings);
   let identity_settings = settings?.identity;
 
   if (!identity_settings) {
@@ -42,7 +41,6 @@ const signin = async (req) => {
 
   const Profiles = await db.folder("Profiles");
 
-  console.log(platform, "uhh");
   // Build query based on unique fields
   let query = { profile: profile_type, platform: platform._id };
 
@@ -90,8 +88,8 @@ const signin = async (req) => {
       },
     });
 
-    return !res.data.ok
-      ? res.data
+    return !res.ok
+      ? res
       : {
           ok: true,
           status: 200,
@@ -99,7 +97,7 @@ const signin = async (req) => {
           data: {
             continuation_token: res.continuation_id,
             two_factor_auth: {
-              type: res.two_factor_auth?.type,
+              type: res?.type,
             },
           },
         };
@@ -178,8 +176,6 @@ const signup = async (req) => {
     req,
     body: { category: [platform._id], key: ["identity", "signup"] },
   });
-
-  console.log(settings);
 
   let identity_settings = settings?.identity;
 
@@ -350,8 +346,6 @@ const two_factor_signup = async (req) => {
       key: ["identity", "signup"],
     },
   });
-
-  console.log(settings, "what you say?");
 
   let identity_settings = settings?.identity;
 

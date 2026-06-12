@@ -105,9 +105,11 @@ const create_session_object = async (profile, platform, req, options) => {
     session_settings,
     template,
     third_party,
+    from_signup_with,
     is_refresh,
     by,
   } = options || {};
+  let no_notify = is_refresh || from_signup_with;
 
   let Sessions = await req.db.folder("Sessions");
   let obj = {
@@ -120,6 +122,7 @@ const create_session_object = async (profile, platform, req, options) => {
     created: Date.now(),
   };
   if (third_party) {
+    obj.third_party_id = third_party._id;
     obj.third_party_uri = third_party.uri;
     obj.third_party_profile = third_party.profile;
   }
@@ -134,7 +137,7 @@ const create_session_object = async (profile, platform, req, options) => {
   }
 
   // Send signin notification only if email is present.
-  if (profile?.email && !is_refresh) {
+  if (profile?.email && !no_notify) {
     if (!session_settings) {
       let settings = await get_settings({
         req,
@@ -239,11 +242,8 @@ const two_fa_challenge = async ({
 }) => {
   let { db } = req;
 
-  console.log(JSON.stringify(two_fa_settings, null, 2));
   if (two_fa_settings) {
-    let signin_response,
-      continuation,
-      delivery = 2;
+    let signin_response, continuation;
     if (two_fa_settings?.enabled) {
       if (two_fa_settings.two_factor_auth?.type === "otp") {
         continuation = await generate_otp({
@@ -255,9 +255,7 @@ const two_fa_challenge = async ({
           charset_type: two_fa_settings.two_factor_auth.otp?.charset || "alnum",
         });
 
-        console.log(continuation);
         if (identity_settings.uniques.includes("email")) {
-          console.log("email?");
           signin_response = await (
             await req.services("aimail")
           ).call(

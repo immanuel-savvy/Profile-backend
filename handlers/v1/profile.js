@@ -274,6 +274,7 @@ const verify_profile = async (req, res) => {
       _id: profileId,
       ...profile_usr.data,
       profile,
+      created: Date.now(),
     });
 
     // Send welcome message to email.
@@ -432,6 +433,7 @@ const social_auth = async (social, { profile_id, res, data, meta }) => {
         email,
         verified: ["email"],
         social_signon: true,
+        created: Date.now(),
         profile: profile_id,
       };
 
@@ -582,7 +584,6 @@ const resend_profile_otp = async (req, res) => {
 
   let response;
 
-  console.log(verification_means, "in here....");
   if (verification_means === "phone") {
     response = await send_message_otp(phone, {
       platform,

@@ -32,19 +32,14 @@ import {
 import {
   authorise_third_party,
   get_permissions,
-  get_third_parties,
-  get_third_parties_by_uri,
-  get_third_party,
-  get_third_party_by_owner_uri,
-  get_third_party_registration,
-  get_third_party_registrations,
-  get_third_party_registrations_by_uri,
+  get_registered_third_parties,
+  get_registered_third_party,
+  get_registration_by_owner_uri,
+  get_registrations,
   get_token,
   grant_permission,
   register_third_party,
   third_party_profile,
-  third_party_signin,
-  third_party_signup,
   update_third_party_permissions,
 } from "../handlers/v3/third_party.js";
 import { me, third_party_me, validate } from "../handlers/v3/validate.js";
@@ -60,91 +55,6 @@ import {
 // 🔑 Route map (KV store)
 const routes = {
   // Third party
-  get_third_party_registrations_by_uri: {
-    handler: get_third_party_registrations_by_uri,
-    security: "api_key",
-    schema: {
-      body: {
-        uris: {
-          required: true,
-          type: "array",
-        },
-      },
-    },
-  },
-  get_third_party_registrations: {
-    handler: get_third_party_registrations,
-    security: "api_key",
-    schema: {
-      body: {
-        limit: {
-          type: "number",
-          default_value: 20,
-        },
-        page: {
-          type: "number",
-          default_value: 0,
-        },
-      },
-    },
-  },
-  get_third_party_registration: {
-    handler: get_third_party_registration,
-    security: "api_key",
-    schema: {
-      body: {
-        uri: {
-          required: true,
-          type: "string",
-        },
-      },
-    },
-  },
-  get_third_parties: {
-    handler: get_third_parties,
-    security: "api_key",
-    schema: {
-      body: {
-        limit: {
-          type: "number",
-          default_value: 20,
-        },
-        page: {
-          default_value: 0,
-          type: "number",
-        },
-      },
-    },
-  },
-  get_third_parties_by_uri: {
-    handler: get_third_parties_by_uri,
-    security: "api_key",
-    schema: {
-      body: {
-        platforms: {
-          type: "array",
-          required: true,
-        },
-      },
-    },
-  },
-  get_third_party: {
-    handler: get_third_party,
-    security: "api_key",
-    schema: {
-      body: {
-        $logic: {
-          or: [
-            {
-              properties: ["token", "owner_uri"],
-              type: "string",
-              required: true,
-            },
-          ],
-        },
-      },
-    },
-  },
   get_permissions: {
     security: "auth_token",
     handler: get_permissions,
@@ -161,54 +71,6 @@ const routes = {
         session_token: {
           type: "string",
           required: true,
-        },
-      },
-    },
-  },
-  third_party_signin: {
-    handler: third_party_signin,
-    security: "api_key",
-    schema: {
-      body: {
-        profile_type: {
-          type: "string",
-          required: true,
-        },
-        third_party_token: {
-          type: "string",
-          required: true,
-        },
-        session_token: {
-          type: "string",
-          required: true,
-        },
-        allow_signup: {
-          type: "boolean",
-          required: false,
-        },
-      },
-    },
-  },
-  third_party_signup: {
-    handler: third_party_signup,
-    security: "api_key",
-    schema: {
-      body: {
-        profile_type: {
-          type: "string",
-          required: true,
-        },
-        third_party_token: {
-          type: "string",
-          required: true,
-        },
-        session_token: {
-          type: "string",
-          required: true,
-        },
-        allow_signin: {
-          type: "boolean",
-          required: false,
         },
       },
     },
@@ -244,18 +106,6 @@ const routes = {
         },
         permissions: {
           type: "object",
-          required: true,
-        },
-      },
-    },
-  },
-  get_third_party_by_owner_uri: {
-    handler: get_third_party_by_owner_uri,
-    security: "api_key",
-    schema: {
-      body: {
-        owner_uri: {
-          type: "string",
           required: true,
         },
       },
@@ -302,6 +152,44 @@ const routes = {
           type: "string",
           required: true,
         },
+      },
+    },
+  },
+  get_registered_third_parties: {
+    handler: get_registered_third_parties,
+    security: "api_key",
+    schema: {
+      body: {
+        limit: { type: "number", default_value: 20 },
+        page: { type: "number", default_value: 1 },
+      },
+    },
+  },
+  get_registered_third_party: {
+    handler: get_registered_third_party,
+    security: "api_key",
+    schema: {
+      body: {
+        uri: { type: "string", required: true },
+      },
+    },
+  },
+  get_registrations: {
+    handler: get_registrations,
+    security: "api_key",
+    schema: {
+      body: {
+        limit: { type: "number", default_value: 20 },
+        page: { type: "number", default_value: 1 },
+      },
+    },
+  },
+  get_registration_by_owner_uri: {
+    handler: get_registration_by_owner_uri,
+    security: "api_key",
+    schema: {
+      body: {
+        owner_uri: { type: "string", required: true },
       },
     },
   },

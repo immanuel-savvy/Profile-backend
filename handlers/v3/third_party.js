@@ -1,8 +1,5 @@
 import crypto from "crypto";
-import {
-  create_session_object,
-  get_platform_profile,
-} from "./helpers/profiles.js";
+import { create_session_object } from "./helpers/profiles.js";
 import { get_settings } from "./helpers/settings.js";
 
 /**
@@ -51,6 +48,19 @@ const register_third_party = async (req, opts = {}) => {
   }
 
   let Platforms = await db.folder("Platforms");
+  let permission_uris = Array.from(Object.keys(permissions));
+  let plats = await Platforms.find({ uri: { $in: permission_uris } }).toArray();
+  if (plats?.length !== permission_uris.length) {
+    const foundUris = (plats || []).map((p) => p.uri);
+    const invalidUris = permission_uris.filter((u) => !foundUris.includes(u));
+
+    return {
+      ok: false,
+      status: 400,
+      message: `Invalid permission platform URIs: ${invalidUris.join(", ")}`,
+      data: { invalid_uris: invalidUris },
+    };
+  }
 
   target_platform = target_platform || (await Platforms.findOne({ uri }));
 
@@ -90,7 +100,7 @@ const register_third_party = async (req, opts = {}) => {
 
   let permitting = new Array();
   for (let t_uri in permissions) {
-    let t_platform = await Platforms.findOne({ uri: t_uri });
+    let t_platform = plats.find((p) => p.uri === t_uri);
 
     let res = await register_third_party(
       {
@@ -119,171 +129,6 @@ const register_third_party = async (req, opts = {}) => {
       permissions,
       permitting,
     },
-  };
-};
-
-const get_third_party_registration = async (req) => {
-  let { headers, body, db } = req;
-
-  let { platform } = headers;
-  let { uri } = body;
-
-  let Third_party_platforms = await db.folder("Third_party_platforms");
-
-  let data = await Third_party_platforms.findOne({
-    owner_platform: platform._id,
-    uri,
-  });
-
-  return {
-    message: data ? "Retrieved" : "Not found",
-    response_code: data ? "retrieved" : "not_found",
-    ok: !!data,
-    data,
-  };
-};
-
-const get_third_party_registrations_by_uri = async (req) => {
-  let { headers, body, db } = req;
-
-  let { platform } = headers;
-  let { uris } = body;
-
-  let Third_party_platforms = await db.folder("Third_party_platforms");
-
-  let query = { uri: { $in: uris }, owner_platform: platform._id };
-  let data = await Third_party_platforms.find(query);
-
-  return {
-    ok: true,
-    data,
-    message: "Retrieved",
-    response_code: "retrieved",
-  };
-};
-
-const get_third_party_registrations = async (req) => {
-  let { headers, body, db } = req;
-
-  let { platform } = headers;
-  let { limit, page } = body;
-
-  let Third_party_platforms = await db.folder("Third_party_platforms");
-
-  let query = {
-    owner_platform: platform._id,
-  };
-  let parties = await Third_party_platforms.find(query)
-    .limit(limit)
-    .skip(page * limit)
-    .toArray();
-
-  return {
-    ok: true,
-    data: parties,
-    pagination: { folder: Third_party_platforms, limit, page, query },
-    message: "Retrieved",
-    response_code: "retrieved",
-  };
-};
-
-const get_third_party = async (req) => {
-  let { headers, body, db } = req;
-  let { platform } = headers;
-  let { token } = body;
-
-  let Third_party_platforms = await db.folder("Third_party_platforms");
-
-  let query = { uri: platform.uri };
-  if (token) query.token = token;
-
-  let data = await Third_party_platforms.findOne(query);
-
-  return {
-    ok: !!data,
-    data,
-    message: data ? "Retrieved" : "Not found",
-    response_code: data ? "retrieved" : "not_found",
-  };
-};
-
-const get_third_party_by_owner_uri = async (req) => {
-  let { headers, body, db } = req;
-  let { platform } = headers;
-  let { owner_uri } = body;
-
-  let Third_party_platforms = await db.folder("Third_party_platforms");
-  let Platforms = await db.folder("Platforms");
-  let owner_platform = await Platforms.findOne({ uri: owner_uri });
-  if (!owner_platform) {
-    return {
-      ok: false,
-      message: "Owner platform not found",
-      status: 400,
-    };
-  }
-
-  let query = { uri: platform.uri, owner_platform: owner_platform._id };
-
-  let data = await Third_party_platforms.findOne(query);
-
-  return {
-    ok: !!data,
-    data,
-    message: data ? "Retrieved" : "Not found",
-    response_code: data ? "retrieved" : "not_found",
-  };
-};
-
-const get_third_parties = async (req) => {
-  let { headers, body, db } = req;
-
-  // Accept either a platform object or just a uri string in headers.platform
-  let { platform } = headers;
-  let { limit, page } = body;
-
-  let Third_party_platforms = await db.folder("Third_party_platforms");
-
-  let items = await Third_party_platforms.find({ uri: platform.uri })
-    .limit(limit)
-    .skip(limit * page)
-    .toArray();
-
-  return {
-    ok: true,
-    message: "Retrieved",
-    response_code: "retrieved",
-    pagination: {
-      folder: Third_party_platforms,
-      query: { uri: platform.uri },
-      page,
-      limit,
-    },
-    data: items,
-  };
-};
-
-const get_third_parties_by_uri = async (req) => {
-  let { headers, body, db } = req;
-  let { platform } = headers;
-  let { platforms } = body;
-
-  let Third_party_platforms = await db.folder("Third_party_platforms");
-
-  platforms = await (
-    await db.folder("Platforms")
-  ).find({ uri: { $in: platforms } });
-
-  let data = await Third_party_platforms.find({
-    uri: platform.uri,
-    owner_platform: { $in: platforms.map((p) => p._id) },
-  });
-
-  return {
-    ok: true,
-    data,
-    message: "Retrieved",
-    response_code: "retrieved",
   };
 };
 
@@ -491,242 +336,6 @@ const handle_permissions_session = async ({
   return tokens;
 };
 
-const third_party_signin = async (req, opt) => {
-  let { from_signup } = opt || {};
-  let { headers, db, body } = req;
-
-  let { platform } = headers;
-  let {
-    third_party_token,
-    session_token,
-    profile_type,
-    allow_signup,
-
-    // from $third_party_signup
-    allow_signin,
-  } = body;
-
-  let Third_party_platforms = await db.folder("Third_party_platforms");
-  let third_party = await Third_party_platforms.findOne({
-    api_key: third_party_token,
-  });
-
-  if (!third_party) {
-    return {
-      ok: false,
-      response_code: "invalid_third_party_token",
-      message: "Invalid third party token",
-      status: 400,
-    };
-  }
-
-  // console.log(third_party.profile_types, profile_type, "PROFILE TYPE CHECK");
-
-  if (!third_party.profile_types.includes(profile_type)) {
-    return {
-      ok: false,
-      response_code: "type_out_of_scope",
-      message: "Third party profile type out of scope",
-      status: 400,
-    };
-  }
-
-  let Platforms = await db.folder("Platforms");
-  let session_platform = await Platforms.findOne({
-    _id: third_party.owner_platform,
-  });
-
-  let Sessions = await db.folder("Sessions");
-  let session_profile = await Sessions.findOne({
-    token: session_token,
-    platform: session_platform._id,
-  });
-  if (!session_profile) {
-    return {
-      ok: false,
-      status: 400,
-      response_code: "invalid_session_token",
-      message: "Invalid session token",
-    };
-  }
-
-  let Profiles = await db.folder("Profiles");
-  session_profile = await Profiles.findOne({ _id: session_profile.profile });
-
-  // Retrieve settings
-  let setting_keys = ["identity", from_signup ? "signup" : "signin", "session"];
-
-  let settings = await get_settings({
-    req,
-    body: {
-      category: [platform._id],
-      key: setting_keys,
-    },
-  });
-
-  let identity_settings = settings?.identity;
-  if (!identity_settings) {
-    identity_settings = {
-      uniques: ["email"],
-    };
-  }
-
-  const or = identity_settings.uniques.map((field) => ({
-    [field]: session_profile[field],
-  }));
-
-  const profile = await Profiles.findOne({ profile: profile_type, $or: or });
-
-  if (profile && from_signup && !allow_signin) {
-    return {
-      ok: false,
-      message: "Profile already exist",
-      response_code: "profile_already_exist",
-      status: 400,
-    };
-  }
-
-  if (!profile) {
-    if (allow_signup && !from_signup) return await third_party_signup(req);
-
-    return {
-      ok: false,
-      message: "Profile not found",
-      response_code: "profile_not_found",
-      status: 400,
-      response: {
-        settings,
-        third_party,
-        session_platform,
-        session_profile,
-      },
-    };
-  }
-
-  let response = await create_session_object(profile, platform, req, {
-    session_settings: settings?.session,
-    by: session_platform.uri,
-  });
-
-  let tokens = await handle_permissions_session({
-    req,
-    third_party,
-    platform,
-    profile,
-  });
-
-  return {
-    ok: true,
-    response_code: "success",
-    token: response.token,
-    message: "Third party signin successful",
-    data: { tokens, profile },
-  };
-};
-
-const third_party_signup = async (req) => {
-  let { headers, db, body } = req;
-
-  let { platform } = headers;
-  let res = await third_party_signin(req, { from_signup: true });
-
-  let { profile_type } = body;
-
-  if (res.response_code === "profile_not_found") {
-    let Profiles = await db.folder("Profiles");
-
-    let { payload } = req;
-    let { settings, session_platform, session_profile } = payload;
-
-    let identity_settings = settings?.identity;
-    if (!identity_settings) {
-      identity_settings = {
-        uniques: ["email"],
-      };
-    }
-
-    let new_profile = {
-      profile: profile_type,
-      platform: platform._id,
-      created: Date.now(),
-      _id: crypto.randomUUID(),
-    };
-
-    let confirm_not_present = {};
-    identity_settings.uniques.map((u) => {
-      let v = session_profile[u];
-      if (v != null) {
-        confirm_not_present[u] = v;
-        new_profile[u] = v;
-      }
-    });
-
-    let existing = await Profiles.findOne({
-      profile: profile_type,
-      ...confirm_not_present,
-    });
-    if (existing) {
-      return {
-        ok: false,
-        message: "Profile already exist",
-        response_code: "profile_already_exist",
-        status: 400,
-      };
-    }
-
-    if (session_profile.fullname)
-      if (session_profile.fullname) {
-        new_profile.fullname = session_profile.fullname;
-      } else {
-        new_profile.fullname = `Profile ${crypto.randomBytes(3).toString("hex")}`;
-      }
-    if (session_profile.firstname)
-      new_profile.firstname = session_profile.firstname;
-    if (session_profile.lastname)
-      new_profile.lastname = session_profile.lastname;
-
-    await Profiles.insertOne(new_profile);
-
-    let response = await create_session_object(new_profile, platform, req, {
-      session_settings: settings.session,
-      by: session_platform.uri,
-    });
-
-    let tokens = await handle_permissions_session({
-      req,
-      third_party,
-      session_platform,
-      session_profile,
-      platform,
-    });
-
-    let welcome_notification = settings?.signup?.notification;
-    if (welcome_notification?.enabled && new_profile.email) {
-      await req.services("aimail").call("send_mail", {
-        from: platform.name,
-        to: new_profile.email,
-        content: {
-          template: welcome_notification?.template || "welcome",
-          params: { profile: new_profile },
-        },
-      });
-    }
-
-    res = {
-      ok: true,
-      token: response.token,
-      message: "Third party Signup successful",
-      response_code: "third_party_signup_successful",
-      data: {
-        profile: new_profile,
-        tokens,
-      },
-    };
-  }
-
-  return res;
-};
-
 const grant_permission = async (req) => {
   // Grant permission to your platform profile from another platform profile of yours.
   let { headers, db, body } = req;
@@ -788,13 +397,17 @@ const get_permissions = async (req) => {
   let { headers, db } = req;
   let { profile } = headers;
 
-  let permissions = get_settings({
+  let platform = await (
+    await db.folder("Platforms")
+  ).findOne({ _id: profile.platform });
+
+  let permissions = await get_settings({
     req,
     body: {
       category: [profile.platform],
       key: "permissions",
     },
-    profile: await get_platform_profile(req, { _id: profile.platform }),
+    profile: platform.profile,
     options: { full: true },
   });
 
@@ -814,7 +427,7 @@ const get_permissions = async (req) => {
       profile_type: { $in: profile_types },
       platform_uri: uri,
       third_party_profile: profile._id,
-    });
+    }).toArray();
 
     data[uri] = new Array();
     for (let s = 0; sess.length; s++) {
@@ -883,6 +496,18 @@ const update_third_party_permissions = async (req) => {
 
   let Third_party_platforms = await db.folder("Third_party_platforms");
 
+  let Platforms = await db.folder("Platforms");
+
+  let t_uris = Object.keys(permissions);
+  let t_platforms = await Platforms.find({ uri: { $in: t_uris } }).toArray();
+  if (t_platforms.length !== t_uris.length) {
+    return {
+      ok: false,
+      message: "Confirm all uris are valid",
+      status: 400,
+    };
+  }
+
   let third_party = await Third_party_platforms.findOne({
     owner_platform: platform._id,
     api_key: token,
@@ -901,14 +526,13 @@ const update_third_party_permissions = async (req) => {
     { $set: { permissions: { ...third_party.permissions, ...permissions } } },
   );
 
-  let Platforms = await db.folder("Platforms");
   let target_platform = await Platforms.findOne({
     _id: third_party.target_platform,
   });
 
   let permitting = new Array();
   for (let uri in permissions) {
-    let t_platform = await Platforms.findOne({ uri });
+    let t_platform = t_platforms.find((t) => t.uri === uri);
 
     let res = await register_third_party(
       {
@@ -922,7 +546,7 @@ const update_third_party_permissions = async (req) => {
       { target_platform, by: platform._id },
     );
 
-    permitting.push(res);
+    res?.ok && permitting.push(res);
   }
 
   return {
@@ -932,22 +556,116 @@ const update_third_party_permissions = async (req) => {
   };
 };
 
+const get_registrations = async (req) => {
+  let { headers, db, body } = req;
+  let { platform } = headers;
+  let { limit, page } = body;
+
+  let Third_party_platforms = await db.folder("Third_party_platforms");
+  let thirds = await Third_party_platforms.find({
+    target_platform: platform._id,
+  })
+    .limit(limit)
+    .skip(limit * (page - 1))
+    .toArray();
+
+  return {
+    ok: true,
+    message: "Retrieved",
+    data: thirds,
+  };
+};
+
+const get_registration_by_owner_uri = async (req) => {
+  let { headers, db, body } = req;
+  let { platform } = headers;
+  let { owner_uri } = body;
+
+  let Platforms = await db.folder("Platforms");
+  let owner_platform = await Platforms.findOne({ uri: owner_uri });
+
+  if (!owner_platform) {
+    return {
+      ok: false,
+      message: "Invalid owner uri",
+      status: 400,
+    };
+  }
+
+  let Third_party_platforms = await db.folder("Third_party_platforms");
+  let third = await Third_party_platforms.findOne({
+    target_platform: platform._id,
+    owner_platform: owner_platform._id,
+  });
+
+  return {
+    ok: true,
+    message: "Retrieved",
+    data: third,
+  };
+};
+
+const get_registered_third_parties = async (req) => {
+  let { headers, db, body } = req;
+  let { platform } = headers;
+  let { limit, page } = body;
+
+  let Third_party_platforms = await db.folder("Third_party_platforms");
+  let thirds = await Third_party_platforms.find({
+    owner_platform: platform._id,
+  })
+    .limit(limit)
+    .skip(limit * (page - 1))
+    .toArray();
+
+  return {
+    ok: true,
+    message: "Retrieved",
+    data: thirds,
+  };
+};
+
+const get_registered_third_party = async (req) => {
+  let { headers, db, body } = req;
+  let { platform } = headers;
+  let { uri } = body;
+
+  let target_platform = await (await db.folder("Platforms")).findOne({ uri });
+  if (!target_platform) {
+    return {
+      ok: false,
+      message: "Invalid target uri",
+      status: 400,
+    };
+  }
+  let Third_party_platforms = await db.folder("Third_party_platforms");
+  let third = await Third_party_platforms.findOne({
+    owner_platform: platform._id,
+    target_platform: target_platform._id,
+  });
+
+  return {
+    ok: true,
+    message: "Retrieved",
+    data: third,
+  };
+};
+
 export {
   register_third_party,
   authorise_third_party,
   refresh_third_party_token,
-  get_token,
+  grant_permission,
   update_third_party_permissions,
   third_party_profile,
-  third_party_signin,
-  get_third_parties_by_uri,
-  third_party_signup,
-  grant_permission,
+  get_token,
+
+  //
   get_permissions,
-  get_third_parties,
-  get_third_party,
-  get_third_party_registrations,
-  get_third_party_registration,
-  get_third_party_registrations_by_uri,
-  get_third_party_by_owner_uri,
+  get_registration_by_owner_uri,
+  get_registrations,
+
+  //
+  get_registered_third_parties,
+  get_registered_third_party,
 };
