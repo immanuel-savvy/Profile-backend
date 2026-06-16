@@ -29,9 +29,12 @@ import {
   update_profile,
   update_profile_identity,
 } from "../handlers/v3/profiles.js";
+import { third_party_signup } from "../handlers/v3/signup_with.js";
 import {
   authorise_third_party,
   get_permissions,
+  get_profile_authorised_third_parties,
+  get_profile_unauthorised_third_parties,
   get_registered_third_parties,
   get_registered_third_party,
   get_registration_by_owner_uri,
@@ -190,6 +193,37 @@ const routes = {
     schema: {
       body: {
         owner_uri: { type: "string", required: true },
+      },
+    },
+  },
+
+  get_profile_authorised_third_parties: {
+    handler: get_profile_authorised_third_parties,
+    security: "auth_token",
+    schema: {
+      body: {
+        limit: { type: "number", default_value: 20 },
+        page: { type: "number", default_value: 1 },
+      },
+    },
+  },
+  get_profile_unauthorised_third_parties: {
+    handler: get_profile_unauthorised_third_parties,
+    security: "auth_token",
+    schema: {
+      body: {
+        limit: { type: "number", default_value: 20 },
+        page: { type: "number", default_value: 1 },
+      },
+    },
+  },
+  third_party_signup: {
+    handler: third_party_signup,
+    security: "auth_token",
+    schema: {
+      body: {
+        third_party_token: { type: "string", required: true },
+        profile_type: { type: "string", required: true },
       },
     },
   },

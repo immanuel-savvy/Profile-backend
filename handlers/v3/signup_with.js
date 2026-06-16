@@ -1,7 +1,7 @@
 import { create_session_object } from "./helpers/profiles.js";
 
 const signup_with = async (req, opts = {}) => {
-  let { is_signin } = opts || {};
+  let { is_signin, from_third_party } = opts || {};
   const { body, headers, db, services } = req;
 
   const { third_party_token, session_token, profile_type } = body;
@@ -126,10 +126,17 @@ const signup_with = async (req, opts = {}) => {
     }
   }
 
-  let sess = await create_session_object(profile, platform, req, {
-    from_signup_with: !is_new,
-    by: third_party.owner_platform,
-  });
+  let sess = from_third_party
+    ? await create_session_object(profile, platform, req, {
+        third_party: {
+          profile: session_profile._id,
+          _id: third_party.owner_platform,
+        },
+      })
+    : await create_session_object(profile, platform, req, {
+        from_signup_with: !is_new,
+        by: third_party.owner_platform,
+      });
 
   // Now manage permission dependencies.
   let Platforms = await db.folder("Platforms");
@@ -177,4 +184,34 @@ const signup_with = async (req, opts = {}) => {
   };
 };
 
-export { signup_with };
+const third_party_signup = async (req) => {
+  let { headers, db, body } = req;
+  let { authorization } = headers;
+
+  let { third_party_token, profile_type } = body;
+
+  let third_party = await (
+    await db.folder("Third_party_platforms")
+  ).findOne({ api_key: third_party_token });
+  let Platforms = await db.folder("Platforms");
+  let target_platform = await Platforms.findOne({
+    _id: third_party.target_platform,
+  });
+
+  let res = await signup_with(
+    {
+      ...req,
+      headers: { platform: target_platform },
+      body: {
+        third_party_token,
+        session_token: authorization?.replace(`Bearer `, ""),
+        profile_type,
+      },
+    },
+    { from_third_party: true },
+  );
+
+  return res;
+};
+
+export { signup_with, third_party_signup };

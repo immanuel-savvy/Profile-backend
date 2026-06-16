@@ -243,7 +243,6 @@ const get_token = async (req) => {
 
   let { profile, platform_uri } = body;
 
-  console.log(body, platform, "in here...");
   let Sessions = await db.folder("Sessions");
 
   let session = await Sessions.findOne({
@@ -651,6 +650,141 @@ const get_registered_third_party = async (req) => {
   };
 };
 
+const get_profile_authorised_third_parties = async (req) => {
+  let { headers, db, body } = req;
+  let { profile } = headers;
+
+  let { limit = 20, page = 1 } = body;
+
+  let Third_party_platforms = await db.folder("Third_party_platforms");
+
+  let Sessions = await db.folder("Sessions");
+
+  let thirds = await Third_party_platforms.find({
+    owner_platform: profile.platform,
+  }).toArray();
+
+  if (!thirds.length) {
+    return {
+      ok: true,
+      message: "No authorised third parties",
+      data: {
+        profiles: [],
+        platforms: [],
+        profile_types: [],
+        sessions: [],
+      },
+    };
+  }
+
+  let sessions = await Sessions.find({
+    platform: {
+      $in: thirds.map((t) => t.target_platform),
+    },
+    third_party_profile: profile._id,
+  })
+    .limit(limit)
+    .skip((page - 1) * limit)
+    .toArray();
+
+  let Profiles = await db.folder("Profiles");
+  let Profile_types = await db.folder("Profile_types");
+  let Platforms = await db.folder("Platforms");
+
+  let [profiles, profile_types, platforms] = await Promise.all([
+    Profiles.find({
+      _id: {
+        $in: sessions.map((s) => s.profile),
+      },
+    }).toArray(),
+
+    Profile_types.find({
+      _id: {
+        $in: sessions.map((s) => s.profile_type),
+      },
+    }).toArray(),
+
+    Platforms.find({
+      _id: {
+        $in: sessions.map((s) => s.platform),
+      },
+    }).toArray(),
+  ]);
+
+  return {
+    ok: true,
+    message: "Authorised",
+    data: {
+      sessions,
+      profiles,
+      platforms,
+      profile_types,
+    },
+  };
+};
+
+const get_profile_unauthorised_third_parties = async (req) => {
+  let { headers, db, body } = req;
+  let { profile } = headers;
+
+  let { limit = 20, page = 1 } = body;
+
+  let Third_party_platforms = await db.folder("Third_party_platforms");
+
+  let Sessions = await db.folder("Sessions");
+
+  let thirds = await Third_party_platforms.find({
+    owner_platform: profile.platform,
+  }).toArray();
+
+  if (!thirds.length) {
+    return {
+      ok: true,
+      message: "No third parties registered",
+      data: [],
+    };
+  }
+
+  let sessions = await Sessions.find({
+    platform: {
+      $in: thirds.map((t) => t.target_platform),
+    },
+    third_party_profile: profile._id,
+  }).toArray();
+
+  let authorised_platforms = new Set(sessions.map((s) => s.platform));
+
+  let unauthorised = thirds.filter(
+    (t) => !authorised_platforms.has(t.target_platform),
+  );
+
+  let Platforms = await db.folder("Platforms");
+
+  let platforms = await Platforms.find({
+    _id: {
+      $in: unauthorised.map((u) => u.target_platform),
+    },
+  })
+    .limit(limit)
+    .skip((page - 1) * limit)
+    .toArray();
+
+  let ptypes = [];
+  unauthorised.map((u) => ptypes.push(...u.profile_types));
+
+  return {
+    ok: true,
+    message: "Response",
+    data: {
+      third_parties: unauthorised,
+      platforms,
+      profile_types: await (await db.folder("Profile_types"))
+        .find({ _id: { $in: ptypes } })
+        .toArray(),
+    },
+  };
+};
+
 export {
   register_third_party,
   authorise_third_party,
@@ -668,4 +802,8 @@ export {
   //
   get_registered_third_parties,
   get_registered_third_party,
+
+  //
+  get_profile_authorised_third_parties,
+  get_profile_unauthorised_third_parties,
 };

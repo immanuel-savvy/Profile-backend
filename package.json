@@ -14,7 +14,7 @@
     "@godprotocol/repositories": "^1.1.27",
     "crypto": "^1.0.1",
     "dotenv": "^17.2.3",
-    "godprotocol": "^2.2.81",
+    "godprotocol": "^2.2.85",
     "google-auth-library": "^10.5.0",
     "twilio": "^5.13.1"
   }

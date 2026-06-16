@@ -35,7 +35,8 @@ const me = async (req) => {
 
   let x_platform = headers["x-platform"];
   let authorization = headers["authorization"];
-  console.log(authorization, x_platform);
+
+  console.log(x_platform, authorization, "ok");
 
   if (!authorization) {
     return {
@@ -44,8 +45,6 @@ const me = async (req) => {
       status: 400,
     };
   } else authorization = authorization.replace("Bearer ", "");
-
-  console.log(authorization, x_platform);
 
   let Sessions = await db.folder("Sessions");
   let session = await Sessions.findOne({
@@ -99,7 +98,7 @@ const third_party_me = async (req) => {
   let xplatform = headers["x-platform"];
   let token = headers.authorization;
 
-  console.log(token, xplatform);
+  console.log(token, xplatform, "log here");
 
   let { from } = body;
 

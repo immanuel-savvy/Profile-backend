@@ -240,7 +240,8 @@ const two_fa_challenge = async ({
   otp_sub,
   template = {},
 }) => {
-  let { db } = req;
+  let { db } = req,
+    sent_to;
 
   if (two_fa_settings) {
     let signin_response, continuation;
@@ -309,9 +310,9 @@ const two_fa_challenge = async ({
 
             if (!signin_response?.ok) {
               return signin_response;
-            }
+            } else sent_to = profile.phone;
           } else return signin_response;
-        }
+        } else sent_to = profile.email;
       } else if (two_fa_settings.two_factor_auth?.type === "link") {
         let Reset_tokens = await db.folder("Reset_tokens");
         let token = crypto.randomBytes(48).toString("hex");
@@ -375,8 +376,9 @@ const two_fa_challenge = async ({
             );
 
             if (!signin_response?.ok) return signin_response;
+            else sent_to = profile.phone;
           } else return signin_response;
-        }
+        } else sent_to = profile.email;
       }
 
       let continuation_db = await db.folder("2fa_continuations");
@@ -406,6 +408,7 @@ const two_fa_challenge = async ({
         ok: true,
         continuation_id: continuation?._id,
         type: two_fa_settings.two_factor_auth?.type,
+        sent_to,
         data: signin_response,
       };
     }

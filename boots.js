@@ -11,10 +11,13 @@ const boots = async () => {
     db_name: "v3-profiles",
   });
 
-  let Profiles = await db.collection("Profiles");
+  let Profiles = await db.collection("Sessions");
 
   return console.log(
-    await Profiles.deleteOne({ _id: "13720939-74c5-48aa-a0c1-2ec03f8629dc" }),
+    await Profiles.findOne({
+      token:
+        "acc5ef7f149ed651e5d9f98cc09798e3ed2403276d99580503d0745ca2a5ae43cb0a8d8c31aa63243232cb3519b6b9d3",
+    }),
   );
   let profiles = [
     {
