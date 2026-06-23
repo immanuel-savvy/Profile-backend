@@ -269,10 +269,10 @@ const signup = async (req, opts) => {
 
       if (!creds.ok) {
         return creds;
-      }
+      } else creds = creds.data;
     }
 
-    details = { ...creds.data };
+    details = { ...creds };
   }
 
   // Ensure unique identity fields are configured and provided
