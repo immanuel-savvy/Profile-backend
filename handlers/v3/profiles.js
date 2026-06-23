@@ -283,8 +283,6 @@ const signup = async (req) => {
     };
   }
 
-  console.log(details);
-
   let Profiles = await db.folder("Profiles");
 
   // Verify none of the unique identity values are already used for this profile type
@@ -294,9 +292,7 @@ const signup = async (req) => {
     .map((field) => ({
       [field]: details[field],
     }));
-  console.log(or, "heyyy", profile_type);
   const existing = await Profiles.findOne({ profile: profile_type, $or: or });
-  console.log(existing);
   if (existing) {
     return {
       ok: false,
@@ -1115,7 +1111,7 @@ const reset_password_by_old_password = async (req) => {
     { _id: prev_pass?._id || pass_id },
     {
       $set: { key: hash(new_password) },
-      $setOnInsert: { _id: pass_id, created: Date.now() },
+      $setOnInsert: { _id: pass_id, created: Date.now(), profile: profile._id },
     },
   );
 

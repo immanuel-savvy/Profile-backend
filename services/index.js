@@ -1,4 +1,4 @@
-let DEV = !process.env.PROD;
+let DEV = false && !process.env.DEV;
 
 const services = {
   settings: {
