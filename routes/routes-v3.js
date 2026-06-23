@@ -501,9 +501,14 @@ const routes = {
     security: "api_key",
     schema: {
       body: {
-        credentials: {
-          required: true,
-          type: "object",
+        $logic: {
+          or: [
+            {
+              properties: ["credentials", "social"],
+              required: true,
+              type: "object",
+            },
+          ],
         },
         profile_type: {
           required: true,
@@ -543,9 +548,14 @@ const routes = {
     security: "api_key",
     schema: {
       body: {
-        details: {
-          required: true,
-          type: "object",
+        $logic: {
+          or: [
+            {
+              properties: ["details", "social"],
+              required: true,
+              type: "object",
+            },
+          ],
         },
         profile_type: {
           required: true,

@@ -7,6 +7,7 @@ import {
   get_platform_profile,
   two_fa_challenge,
 } from "./helpers/profiles.js";
+import { OAuth2Client } from "google-auth-library";
 
 const social_auth = async (social, { auth_cred }) => {
   let { meta, type, data } = social;
@@ -60,7 +61,7 @@ const social_auth = async (social, { auth_cred }) => {
 const signin = async (req) => {
   let { db } = req;
   let { platform } = req.headers;
-  const { credentials, social, profile_type, meta_payload } = req.body;
+  let { credentials, social, profile_type, meta_payload } = req.body;
 
   let Profile_types = await db.folder("Profile_types");
   let profile_type_entry = await Profile_types.findOne({
@@ -119,6 +120,14 @@ const signin = async (req) => {
 
   let profile = await Profiles.findOne(query);
   if (!profile) {
+    if (social) {
+      let res = await signup(
+        { ...req, body: { social: credentials, profile_type, password: "" } },
+        { from: "signin" },
+      );
+
+      return res;
+    }
     return { ok: false, status: 401, message: "Invalid credentials" };
   }
 
@@ -218,7 +227,8 @@ const two_factor_signin = async (req) => {
   };
 };
 
-const signup = async (req) => {
+const signup = async (req, opts) => {
+  let { from } = opts || {};
   let { db, body, headers } = req;
   let { platform } = headers;
 
@@ -249,12 +259,17 @@ const signup = async (req) => {
   }
 
   if (social) {
-    let creds = await social_auth(social, {
-      auth_cred: identity_settings?.socials?.[social.type],
-    });
+    let creds;
+    if (from === "signin") {
+      creds = social;
+    } else {
+      let creds = await social_auth(social, {
+        auth_cred: identity_settings?.socials?.[social.type],
+      });
 
-    if (!creds.ok) {
-      return creds;
+      if (!creds.ok) {
+        return creds;
+      }
     }
 
     details = { ...creds };
@@ -310,8 +325,8 @@ const signup = async (req) => {
     created: Date.now(),
   };
 
+  let signup_settings = settings?.signup;
   if (!social) {
-    let signup_settings = settings?.signup;
     let two_fa_settings = signup_settings?.two_fa_settings;
     if (!two_fa_settings) {
       two_fa_settings = {
@@ -394,7 +409,7 @@ const signup = async (req) => {
   }
 
   let session_object = await create_session_object(newProfile, platform, req, {
-    meta_payload,
+    // meta_payload,
     session_settings: settings?.session,
     no_notify: true,
   });
