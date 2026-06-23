@@ -180,13 +180,13 @@ const authorise_third_party = async (req) => {
     await db.folder("Platforms")
   ).findOne({ _id: integration.owner_platform });
 
-  if (integration.uri !== platform.uri) {
-    return {
-      ok: false,
-      status: 401,
-      message: "Third party token does not belong to this platform",
-    };
-  }
+  // if (integration.uri !== platform.uri) {
+  //   return {
+  //     ok: false,
+  //     status: 401,
+  //     message: "Third party token does not belong to this platform",
+  //   };
+  // }
 
   let Sessions = await db.folder("Sessions");
 
@@ -199,6 +199,7 @@ const authorise_third_party = async (req) => {
     return {
       ok: false,
       status: 401,
+      status_code: "invalid_session",
       message: "Invalid session token",
     };
   }
@@ -224,6 +225,7 @@ const authorise_third_party = async (req) => {
     {
       third_party: {
         uri: platform.uri,
+        _id: platform._id,
         profile: profile._id,
       },
     },
@@ -247,13 +249,14 @@ const get_token = async (req) => {
 
   let session = await Sessions.findOne({
     third_party_profile: profile,
-    third_party_uri: platform.uri,
+    third_party_id: platform._id,
     platform_uri,
   });
 
   if (!session) {
     return {
       ok: false,
+      status_code: "session_not_found",
       message: "Session not found",
       status: 400,
     };
@@ -323,6 +326,7 @@ const handle_permissions_session = async ({
           {
             third_party: {
               uri: platform.uri,
+              _id: platform._id,
               profile: profile._id,
             },
           },

@@ -9,7 +9,7 @@ const services = {
     uri: "settings.savvyaisolution.com",
   },
   aimail: {
-    url: DEV
+    url: true
       ? "http://localhost:4003"
       : "https://email-api.savvyaisolution.com",
     uri: "aimail.savvyaisolution.com",

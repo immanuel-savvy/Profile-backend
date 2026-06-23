@@ -1,6 +1,7 @@
 import { Mongo } from "@godprotocol/repositories";
 import { Platform_profile_type_id } from "./handlers/v2/platform.js";
 import { hash } from "./utils/hash.js";
+import { PROFILE_PASSWORDS, PROFILES } from "./ds/folders.js";
 
 let Profile_platform_id = "7ab29b3f-37c5-4957-b61f-d5d209aee8d8";
 let Profile_profile_id = "01a84e70-2227-4865-95e1-71072b2badb3";
@@ -11,14 +12,40 @@ const boots = async () => {
     db_name: "v3-profiles",
   });
 
-  let Profiles = await db.collection("Sessions");
+  let Profiles = await db.collection("Profiles");
 
-  return console.log(
-    await Profiles.findOne({
+  console.log(
+    await (
+      await db.collection("Sessions")
+    ).findOne({
       token:
-        "acc5ef7f149ed651e5d9f98cc09798e3ed2403276d99580503d0745ca2a5ae43cb0a8d8c31aa63243232cb3519b6b9d3",
+        "abecba101814bb14a66da82623c7642822d271da178942e913fdbfd9b49d94da611bac91d8a67ca9e48e254492cd2fa7",
     }),
   );
+  // let V1_profiles = await PROFILES();
+  // let V1_passwords = await PROFILE_PASSWORDS();
+
+  // let profiles_old = await V1_profiles.find({
+  //   profile: "bbc10363-bcf6-409e-93d6-eef256c0c92c",
+  // }).toArray();
+
+  // let passwords_old = await V1_passwords.find({
+  //   _id: { $in: profiles_old.map((p) => p._id) },
+  // }).toArray();
+
+  // await Passwords.insertMany(
+  //   passwords_old.map((p) => {
+  //     return {
+  //       profile: p._id,
+  //       _id: crypto.randomUUID(),
+  //       key: p.key,
+  //       created: Date.now(),
+  //     };
+  //   }),
+  // );
+  // console.log(passwords_old);
+
+  return;
   let profiles = [
     {
       fullname: "Immanuel Savvy",
@@ -80,7 +107,6 @@ const boots = async () => {
     },
   ];
 
-  let Passwords = await db.collection("Profile_passwords");
   let passwords = [
     {
       profile: profiles[0]._id,

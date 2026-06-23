@@ -22,12 +22,15 @@ import {
   confirm_update_profile_identity,
   forgot_password,
   reset_password,
+  reset_password_by_old_password,
   signin,
+  signout,
   signup,
   two_factor_signin,
   two_factor_signup,
   update_profile,
   update_profile_identity,
+  validate_continuation_token,
 } from "../handlers/v3/profiles.js";
 import { third_party_signup } from "../handlers/v3/signup_with.js";
 import {
@@ -577,6 +580,35 @@ const routes = {
       },
     },
   },
+  validate_continuation_token: {
+    handler: validate_continuation_token,
+    security: "api_key",
+    schema: {
+      body: {
+        continuation_token: {
+          type: "string",
+          required: true,
+        },
+        profile_type: {
+          required: true,
+          type: "string",
+        },
+        sub_per: {
+          type: "string",
+          required: true,
+        },
+        $logic: {
+          or: [
+            {
+              properties: ["otp", "token"],
+              required: true,
+              type: "string",
+            },
+          ],
+        },
+      },
+    },
+  },
   forgot_password: {
     handler: forgot_password,
     security: "api_key",
@@ -588,6 +620,7 @@ const routes = {
         },
         profile_type: {
           required: true,
+          type: "string",
         },
       },
     },
@@ -597,13 +630,15 @@ const routes = {
     security: "api_key",
     schema: {
       body: {
-        continuation_token: {
-          required: true,
-        },
         $logic: {
           or: [
             {
-              properties: ["otp", "token"],
+              properties: ["continuation_token", "validation_token"],
+              required: true,
+              type: "string",
+            },
+            {
+              properties: ["otp", "token", "validation_token"],
               required: true,
               type: "string",
             },
@@ -705,6 +740,20 @@ const routes = {
       body: {
         webhook: { type: "object", required: true },
         token: { type: "string", required: true },
+      },
+    },
+  },
+  signout: {
+    handler: signout,
+    security: "auth_token",
+  },
+  reset_password_by_old_password: {
+    handler: reset_password_by_old_password,
+    security: "auth_token",
+    schema: {
+      body: {
+        old_password: { required: true, type: "string" },
+        new_password: { required: true, type: "string" },
       },
     },
   },

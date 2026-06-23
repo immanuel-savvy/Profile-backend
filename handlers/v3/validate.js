@@ -36,8 +36,6 @@ const me = async (req) => {
   let x_platform = headers["x-platform"];
   let authorization = headers["authorization"];
 
-  console.log(x_platform, authorization, "ok");
-
   if (!authorization) {
     return {
       ok: false,
@@ -55,6 +53,7 @@ const me = async (req) => {
   if (!session) {
     return {
       ok: false,
+      status_code: "session_not_found",
       message: "Session not found",
       status: 401,
     };
@@ -98,8 +97,6 @@ const third_party_me = async (req) => {
   let xplatform = headers["x-platform"];
   let token = headers.authorization;
 
-  console.log(token, xplatform, "log here");
-
   let { from } = body;
 
   if (!token) {
@@ -114,13 +111,14 @@ const third_party_me = async (req) => {
 
   let session = await Sessions.findOne({
     token,
-    platform_uri: from,
-    third_party_uri: xplatform,
+    platform_uri: xplatform,
+    third_party_uri: from,
   });
 
   if (!session) {
     return {
       ok: false,
+      status_code: "session_not_found",
       message: "Session not found",
       status: 401,
     };
@@ -130,6 +128,7 @@ const third_party_me = async (req) => {
     await Sessions.deleteOne({ _id: session._id });
     return {
       ok: false,
+      status_code: "session_expired",
       message: "Session expired",
       status: 401,
     };
@@ -148,7 +147,7 @@ const third_party_me = async (req) => {
 
   let Platforms = await db.folder("Platforms");
   let platform = await Platforms.findOne({
-    uri: session.platform_uri,
+    _id: session.platform,
   });
   let third_party_platform = await Platforms.findOne({ uri: from });
 

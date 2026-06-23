@@ -106,10 +106,11 @@ const create_session_object = async (profile, platform, req, options) => {
     template,
     third_party,
     from_signup_with,
+    no_notify,
     is_refresh,
     by,
   } = options || {};
-  let no_notify = is_refresh || from_signup_with;
+  no_notify = no_notify || is_refresh || from_signup_with;
 
   let Sessions = await req.db.folder("Sessions");
   let obj = {
@@ -180,7 +181,23 @@ const create_session_object = async (profile, platform, req, options) => {
 };
 
 const validate_continuation = async (db, continuation_token, props) => {
-  let { otp, token, sub = "general" } = props;
+  let { otp, token, sub = "general", validation_token } = props;
+
+  if (validation_token) {
+    let Validations = await db.folder("Validations");
+    let validation = await Validations.findOne({ _id: validation_token, sub });
+    if (!validation) {
+      return {
+        ok: false,
+        message: "Invalid validation token",
+      };
+    }
+
+    await Validations.deleteOne({ _id: validation_token });
+
+    return { ok: true, continuation: validation.continuation };
+  }
+
   let continuation_db = await db.folder("2fa_continuations");
   let continuation = await continuation_db.findOne({ _id: continuation_token });
 
@@ -224,7 +241,7 @@ const validate_continuation = async (db, continuation_token, props) => {
     return { ok: false, status: 400, message: "Invalid continuation type" };
   }
 
-  continuation_db.deleteOne({ _id: continuation_token });
+  await continuation_db.deleteOne({ _id: continuation_token });
 
   return { ok: true, continuation };
 };
@@ -249,14 +266,16 @@ const two_fa_challenge = async ({
       if (two_fa_settings.two_factor_auth?.type === "otp") {
         continuation = await generate_otp({
           db,
-          identity: identity_settings.uniques.map((field) => profile[field]),
+          identity: identity_settings.uniques
+            .map((field) => profile[field])
+            .filter((f) => !!f),
           sub: otp_sub,
           length: two_fa_settings.two_factor_auth.otp?.length || 6,
           expiry: two_fa_settings.two_factor_auth.otp?.expiry || 5,
           charset_type: two_fa_settings.two_factor_auth.otp?.charset || "alnum",
         });
 
-        if (identity_settings.uniques.includes("email")) {
+        if (identity_settings.uniques.includes("email") && profile.email) {
           signin_response = await (
             await req.services("aimail")
           ).call(
@@ -326,7 +345,7 @@ const two_fa_challenge = async ({
         };
         await Reset_tokens.insertOne(continuation);
 
-        if (identity_settings?.uniques?.includes("email")) {
+        if (identity_settings?.uniques?.includes("email") && profile.email) {
           signin_response = await (
             await req.services("aimail")
           ).call(
@@ -351,7 +370,7 @@ const two_fa_challenge = async ({
           );
         }
         if (!signin_response?.ok) {
-          if (identity_settings?.uniques?.includes("phone")) {
+          if (identity_settings?.uniques?.includes("phone") && profile.phone) {
             signin_response = await (
               await req.services("aimail")
             ).call(

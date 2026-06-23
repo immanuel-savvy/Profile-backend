@@ -26,11 +26,10 @@ const get_settings = async ({ req, body, profile, options }) => {
 
     if (categories.includes("general")) {
       for (const category of body.category) {
-        if (!categories.includes(category)) {
-          res.data[category] = {
-            ...res.data.general,
-          };
-        }
+        res.data[category] = {
+          ...res.data.general,
+          ...res.data[category],
+        };
       }
     }
 
@@ -41,11 +40,33 @@ const get_settings = async ({ req, body, profile, options }) => {
     }
   }
 
-  console.log(res);
+  console.log(JSON.stringify(res, null, 2));
 
   if (full) return res;
 
   return res?.data || {};
+};
+
+const deepMerge = (base, override) => {
+  if (!base || typeof base !== "object") return override;
+  if (!override || typeof override !== "object") return base;
+
+  const result = { ...base };
+
+  for (const key of Object.keys(override)) {
+    if (
+      typeof base[key] === "object" &&
+      typeof override[key] === "object" &&
+      !Array.isArray(base[key]) &&
+      !Array.isArray(override[key])
+    ) {
+      result[key] = deepMerge(base[key], override[key]);
+    } else {
+      result[key] = override[key];
+    }
+  }
+
+  return result;
 };
 
 const pagination = async (folder, { limit, skip, query }) => {

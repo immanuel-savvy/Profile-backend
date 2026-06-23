@@ -8,10 +8,59 @@ import {
   two_fa_challenge,
 } from "./helpers/profiles.js";
 
+const social_auth = async (social, { auth_cred }) => {
+  let { meta, type, data } = social;
+
+  let os = meta?.os || "android";
+
+  if (type === "google") {
+    let token = (auth_cred?.[os] || auth_cred?.["default"])?.token;
+    const serv = new OAuth2Client(token);
+
+    // 1. Verify Google ID token
+    const ticket = await serv.verifyIdToken({
+      idToken: data.idToken,
+      audience: token,
+    });
+
+    const payload = ticket.getPayload();
+
+    if (!payload) {
+      return res.json({
+        ok: false,
+        message: "Could not verify Google ID token",
+      });
+    }
+
+    const email = payload.email?.trim().toLowerCase();
+    const firstname = payload.given_name || payload.givenName || "";
+    const lastname = payload.family_name || payload.familyName || "";
+    const picture = payload.picture || payload.photo;
+
+    if (!email) {
+      return {
+        ok: false,
+        message: "Google account does not contain a valid email",
+      };
+    }
+
+    return {
+      ok: true,
+      data: {
+        email,
+        firstname,
+        lastname,
+        image: picture,
+        fullname: `${firstname} ${lastname}`,
+      },
+    };
+  }
+};
+
 const signin = async (req) => {
   let { db } = req;
   let { platform } = req.headers;
-  const { credentials, profile_type, meta_payload } = req.body;
+  const { credentials, social, profile_type, meta_payload } = req.body;
 
   let Profile_types = await db.folder("Profile_types");
   let profile_type_entry = await Profile_types.findOne({
@@ -41,18 +90,31 @@ const signin = async (req) => {
 
   const Profiles = await db.folder("Profiles");
 
+  if (social) {
+    let creds = await social_auth(social, {
+      auth_cred: identity_settings.socials?.[social?.type],
+    });
+
+    if (!creds?.ok) {
+      return creds;
+    }
+
+    credentials = { ...creds.data };
+  }
+
   // Build query based on unique fields
   let query = { profile: profile_type, platform: platform._id };
 
   for (let field of identity_settings?.uniques) {
-    if (!credentials[field]) {
-      return {
-        ok: false,
-        status: 400,
-        message: `Missing unique field: ${field}`,
-      };
-    }
-    query[field] = credentials[field];
+    if (credentials[field]) query[field] = credentials[field];
+  }
+
+  if (Object.keys(query).length === 2) {
+    return {
+      ok: false,
+      status: 400,
+      message: `Missing identities field(s) of: ${identity_settings.uniques.join(",")}`,
+    };
   }
 
   let profile = await Profiles.findOne(query);
@@ -60,47 +122,49 @@ const signin = async (req) => {
     return { ok: false, status: 401, message: "Invalid credentials" };
   }
 
-  let Passwords = await db.folder("Profile_passwords");
-  let passwordEntry = await Passwords.findOne({ profile: profile._id });
-  if (!passwordEntry) {
-    return { ok: false, status: 401, message: "Password not found" };
-  }
+  if (!social) {
+    let Passwords = await db.folder("Profile_passwords");
+    let passwordEntry = await Passwords.findOne({ profile: profile._id });
+    if (!passwordEntry) {
+      return { ok: false, status: 401, message: "Password not found" };
+    }
 
-  if (passwordEntry.key !== hash(credentials.password)) {
-    return { ok: false, status: 401, message: "Incorrect password" };
-  }
+    if (passwordEntry.key !== hash(credentials.password)) {
+      return { ok: false, status: 401, message: "Incorrect password" };
+    }
 
-  let signin_settings = settings?.signin;
+    let signin_settings = settings?.signin;
 
-  if (signin_settings?.two_fa_settings?.enabled) {
-    let res = await two_fa_challenge({
-      req,
-      profile,
-      two_fa_settings: signin_settings?.two_fa_settings,
-      platform,
-      profile_type: profile_type_entry,
-      identity_settings,
-      meta_payload,
-      otp_sub: `${profile_type}_signin`,
-      template: {
-        otp: "otp-2fa-signin",
-        link: "link-2fa-signin",
-      },
-    });
+    if (signin_settings?.two_fa_settings?.enabled) {
+      let res = await two_fa_challenge({
+        req,
+        profile,
+        two_fa_settings: signin_settings?.two_fa_settings,
+        platform,
+        profile_type: profile_type_entry,
+        identity_settings,
+        meta_payload,
+        otp_sub: `${profile_type}_signin`,
+        template: {
+          otp: "otp-2fa-signin",
+          link: "link-2fa-signin",
+        },
+      });
 
-    return !res.ok
-      ? res
-      : {
-          ok: true,
-          status: 200,
-          message: "2fa Initiated",
-          data: {
-            continuation_token: res.continuation_id,
-            two_factor_auth: {
-              type: res?.type,
+      return !res.ok
+        ? res
+        : {
+            ok: true,
+            status: 200,
+            message: "2fa Initiated",
+            data: {
+              continuation_token: res.continuation_id,
+              two_factor_auth: {
+                type: res?.type,
+              },
             },
-          },
-        };
+          };
+    }
   }
 
   let session_object = await create_session_object(profile, platform, req, {
@@ -110,7 +174,6 @@ const signin = async (req) => {
 
   return {
     ok: true,
-    status: 200,
     message: "Signin successful",
     token: session_object.token,
     data: profile,
@@ -159,7 +222,7 @@ const signup = async (req) => {
   let { db, body, headers } = req;
   let { platform } = headers;
 
-  let { details, profile_type, password } = body;
+  let { details, social, profile_type, password } = body;
 
   let profile_type_entry = await (
     await db.folder("Profile_types")
@@ -185,6 +248,17 @@ const signup = async (req) => {
     };
   }
 
+  if (social) {
+    let creds = await social_auth(social, {
+      auth_cred: identity_settings?.socials?.[social.type],
+    });
+
+    if (!creds.ok) {
+      return creds;
+    }
+
+    details = { ...creds };
+  }
   let Profiles = await db.folder("Profiles");
 
   // Ensure unique identity fields are configured and provided
@@ -230,52 +304,63 @@ const signup = async (req) => {
     created: Date.now(),
   };
 
-  let signup_settings = settings?.signup;
-  let two_fa_settings = signup_settings?.two_fa_settings;
-  if (!two_fa_settings) {
-    two_fa_settings = {
-      enabled: true,
-      two_factor_auth: {
-        type: "otp",
-        otp: {
-          length: 6,
-          charset: "alnum",
-          expiry: 5,
-          template: "otp-2fa-signup",
-        },
-      },
-    };
-  }
-
-  if (two_fa_settings?.enabled) {
-    let continuation = await two_fa_challenge({
-      req,
-      profile: details,
-      identity_settings,
-      two_fa_settings,
-      profile_type: profile_type_entry,
-      meta_payload: { new_profile: newProfile, password },
-      platform,
-      otp_sub: `${profile_type}_signup`,
-      template: {
-        otp: "otp-2fa-signup",
-        link: "link-2fa-signup",
-      },
-    });
-
-    return !continuation?.ok
-      ? continuation
-      : {
-          ok: true,
-          status: 200,
-          message: "2fa Initiated",
-          data: {
-            continuation_token: continuation.continuation_id,
-            two_factor_auth: {
-              type: continuation?.type,
-            },
+  if (!social) {
+    let signup_settings = settings?.signup;
+    let two_fa_settings = signup_settings?.two_fa_settings;
+    if (!two_fa_settings) {
+      two_fa_settings = {
+        enabled: true,
+        two_factor_auth: {
+          type: "otp",
+          otp: {
+            length: 6,
+            charset: "alnum",
+            expiry: 5,
+            template: "otp-2fa-signup",
           },
-        };
+        },
+      };
+    }
+
+    if (two_fa_settings?.enabled) {
+      let continuation = await two_fa_challenge({
+        req,
+        profile: details,
+        identity_settings,
+        two_fa_settings,
+        profile_type: profile_type_entry,
+        meta_payload: { new_profile: newProfile, password },
+        platform,
+        otp_sub: `${profile_type}_signup`,
+        template: {
+          otp: "otp-2fa-signup",
+          link: "link-2fa-signup",
+        },
+      });
+
+      return !continuation?.ok
+        ? continuation
+        : {
+            ok: true,
+            status: 200,
+            message: "2fa Initiated",
+            data: {
+              continuation_token: continuation.continuation_id,
+              two_factor_auth: {
+                type: continuation?.type,
+              },
+            },
+          };
+    }
+
+    let Profile_passwords = await db.folder("Profile_passwords");
+
+    await Profile_passwords.insertOne({
+      _id: crypto.randomUUID(),
+      profile: newProfile._id,
+      key: hash(password),
+      created: Date.now(),
+    });
   }
 
   let res = await Profiles.insertOne(newProfile);
@@ -287,15 +372,6 @@ const signup = async (req) => {
       message: "Failed to create profile",
     };
   }
-
-  let Profile_passwords = await db.folder("Profile_passwords");
-
-  await Profile_passwords.insertOne({
-    _id: crypto.randomUUID(),
-    profile: newProfile._id,
-    key: hash(password),
-    created: Date.now(),
-  });
 
   let welcome_notification = signup_settings?.notification;
   if (welcome_notification?.enabled) {
@@ -311,11 +387,18 @@ const signup = async (req) => {
     });
   }
 
+  let session_object = await create_session_object(newProfile, platform, req, {
+    meta_payload,
+    session_settings: settings?.session,
+    no_notify: true,
+  });
+
   return {
     ok: true,
     status: 201,
     message: "Signup successful",
     data: newProfile,
+    token: session_object?.token,
   };
 };
 
@@ -458,7 +541,7 @@ const forgot_password = async (req) => {
     return {
       ok: false,
       status: 400,
-      message: "Invalid profile type",
+      message: "Invalid identity settings",
     };
   }
 
@@ -471,17 +554,17 @@ const forgot_password = async (req) => {
   }
 
   let query = { profile: profile_type };
-  for (let field of identity_settings.uniques) {
-    if (!identity[field]) {
-      return {
-        ok: false,
-        status: 400,
-        message: `Missing unique field: ${field}`,
-      };
-    }
-    query[field] = identity[field];
+  for (let field of identity_settings?.uniques) {
+    if (identity[field]) query[field] = identity[field];
   }
 
+  if (Object.keys(query).length === 1) {
+    return {
+      ok: false,
+      status: 400,
+      message: `Missing identities field(s) of: ${identity_settings.uniques.join(",")}`,
+    };
+  }
   let Profiles = await db.folder("Profiles");
   let profile = await Profiles.findOne(query);
   if (!profile) {
@@ -508,8 +591,8 @@ const forgot_password = async (req) => {
       },
     });
 
-    return !res.data.ok
-      ? res.data
+    return !res?.ok
+      ? res
       : {
           ok: true,
           status: 200,
@@ -517,7 +600,7 @@ const forgot_password = async (req) => {
           data: {
             continuation_token: res.continuation_id,
             two_factor_auth: {
-              type: res.two_factor_auth?.type,
+              type: res?.type,
             },
           },
         };
@@ -530,15 +613,56 @@ const forgot_password = async (req) => {
   };
 };
 
+const validate_continuation_token = async (req) => {
+  let { db, body, headers } = req;
+  let { platform } = headers;
+  let { continuation_token, otp, sub_per, token, profile_type } = body;
+
+  let sub = `${profile_type}_${sub_per}`;
+  let validation = await validate_continuation(db, continuation_token, {
+    otp,
+    token,
+    sub,
+  });
+  if (!validation.ok) {
+    return validation;
+  }
+
+  let Validations = await db.folder("Validations");
+
+  let v_token = crypto.randomUUID();
+  await Validations.insertOne({
+    _id: v_token,
+    sub,
+    continuation: validation.continuation,
+  });
+  return {
+    ok: true,
+    message: "Token validated",
+    data: {
+      sub,
+      validation_token: v_token,
+    },
+  };
+};
+
 const reset_password = async (req) => {
   let { db, body, headers } = req;
   let { platform } = headers;
-  let { continuation_token, otp, token, profile_type, new_password } = body;
+  let {
+    continuation_token,
+    validation_token,
+    otp,
+    token,
+    profile_type,
+    new_password,
+  } = body;
 
   let validation = await validate_continuation(db, continuation_token, {
     otp,
     token,
     sub: `${profile_type}_forgot_password`,
+    validation_token,
   });
   if (!validation.ok) {
     return validation;
@@ -565,28 +689,29 @@ const reset_password = async (req) => {
       _id: continuation.meta_payload.profile_id,
     });
 
-    await (
-      await req.services("aimail")
-    ).call(
-      "send_mail",
-      {
-        from: platform.name,
-        to: profile.email,
-        content: {
-          template:
-            forgot_password_settings.notification.template ||
-            "password_reset_successful",
-          params: {
-            profile,
-            platform,
-            profile_type: await (
-              await db.folder("Profile_types")
-            ).findOne({ _id: profile_type }),
+    profile.email &&
+      (await (
+        await req.services("aimail")
+      ).call(
+        "send_mail",
+        {
+          from: platform.name,
+          to: profile.email,
+          content: {
+            template:
+              forgot_password_settings.notification.template ||
+              "password_reset_successful",
+            params: {
+              profile,
+              platform,
+              profile_type: await (
+                await db.folder("Profile_types")
+              ).findOne({ _id: profile_type }),
+            },
           },
         },
-      },
-      { profile: platform.profile },
-    );
+        { profile: platform.profile },
+      ));
   }
 
   return {
@@ -928,9 +1053,54 @@ const confirm_update_profile_identity = async (req) => {
   };
 };
 
+const signout = async (req) => {
+  let { headers, db } = req;
+
+  let author = headers["Authorization"];
+  author = author && author.replace(`Bearer `, "");
+
+  let Sessions = await db.folder("Sessions");
+  await Sessions.deleteOne({ token: author });
+
+  return {
+    ok: true,
+    message: "Sign out successful",
+  };
+};
+
+const reset_password_by_old_password = async (req) => {
+  let { headers, db, body } = req;
+
+  let { profile } = headers;
+  let { old_password, new_password } = body;
+
+  let Profile_passwords = await db.folder("Profile_passwords");
+
+  let prev_pass = await Profile_passwords.findOne({ profile: profile._id });
+  if (hash(old_password) !== prev_pass.key) {
+    return {
+      ok: false,
+      status: 403,
+      message: "Old password is not correct.",
+    };
+  }
+
+  await Profile_passwords.updateOne(
+    { _id: prev_pass._id },
+    { $set: { key: hash(new_password) } },
+  );
+
+  return {
+    ok: true,
+    message: "Password updated successfully",
+  };
+};
+
 export {
   signin,
   signup,
+  signout,
+  reset_password_by_old_password,
   two_factor_signin,
   two_factor_signup,
   forgot_password,
@@ -939,7 +1109,7 @@ export {
   update_profile,
   update_profile_identity,
   confirm_update_profile_identity,
-
+  validate_continuation_token,
   //
   get_platform_profile,
 };
