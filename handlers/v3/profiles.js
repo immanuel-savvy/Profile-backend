@@ -1110,8 +1110,17 @@ const reset_password_by_old_password = async (req) => {
   await Profile_passwords.updateOne(
     { _id: prev_pass?._id || pass_id },
     {
-      $set: { key: hash(new_password) },
-      $setOnInsert: { _id: pass_id, created: Date.now(), profile: profile._id },
+      $set: {
+        key: hash(new_password),
+      },
+      $setOnInsert: {
+        _id: pass_id,
+        created: Date.now(),
+        profile: profile._id,
+      },
+    },
+    {
+      upsert: true,
     },
   );
 
