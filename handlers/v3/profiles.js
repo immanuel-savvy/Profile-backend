@@ -259,7 +259,6 @@ const signup = async (req) => {
 
     details = { ...creds };
   }
-  let Profiles = await db.folder("Profiles");
 
   // Ensure unique identity fields are configured and provided
   if (
@@ -272,21 +271,32 @@ const signup = async (req) => {
       message: "No unique identity fields configured",
     };
   }
-  for (let field of identity_settings.uniques) {
-    if (!details[field]) {
-      return {
-        ok: false,
-        status: 400,
-        message: `Missing unique field: ${field}`,
-      };
-    }
+
+  let det = 0;
+  for (let identity of identity_settings.uniques) {
+    if (details[identity]) det++;
+  }
+  if (!det) {
+    return {
+      ok: false,
+      message: `Missing identity fields: ${identity_settings.uniques.join(",")}`,
+    };
   }
 
+  console.log(details);
+
+  let Profiles = await db.folder("Profiles");
+
   // Verify none of the unique identity values are already used for this profile type
-  const or = identity_settings.uniques.map((field) => ({
-    [field]: details[field],
-  }));
+
+  const or = identity_settings.uniques
+    .filter((field) => details[field] !== undefined)
+    .map((field) => ({
+      [field]: details[field],
+    }));
+  console.log(or, "heyyy", profile_type);
   const existing = await Profiles.findOne({ profile: profile_type, $or: or });
+  console.log(existing);
   if (existing) {
     return {
       ok: false,
@@ -450,20 +460,23 @@ const two_factor_signup = async (req) => {
   }
 
   // Ensure all unique fields are present on the new profile
-  for (let field of identity_settings.uniques) {
-    if (!new_profile[field]) {
-      return {
-        ok: false,
-        status: 400,
-        message: `Missing unique field: ${field}`,
-      };
-    }
+  let det = 0;
+  for (let identity of identity_settings.uniques) {
+    if (new_profile[identity]) det++;
+  }
+  if (!det) {
+    return {
+      ok: false,
+      message: `Missing identity fields: ${identity_settings.uniques.join(",")}`,
+    };
   }
 
   // Verify none of the unique identity values have been taken in the meantime
-  const or = identity_settings.uniques.map((field) => ({
-    [field]: new_profile[field],
-  }));
+  const or = identity_settings.uniques
+    .filter((field) => new_profile[field] !== undefined)
+    .map((field) => ({
+      [field]: new_profile[field],
+    }));
   const existing = await Profiles.findOne({
     profile: new_profile.profile,
     $or: or,
@@ -517,10 +530,17 @@ const two_factor_signup = async (req) => {
     );
   }
 
+  let session_object = await create_session_object(new_profile, platform, req, {
+    // meta_payload,
+    // session_settings: settings?.session,
+    no_notify: true,
+  });
+
   return {
     ok: true,
     status: 201,
     message: "Signup successful",
+    token: session_object.token,
     data: new_profile,
   };
 };
@@ -868,21 +888,24 @@ const update_profile_identity = async (req) => {
     };
   }
 
-  for (let field of identity_settings.uniques) {
-    if (!identity[field]) {
-      return {
-        ok: false,
-        status: 400,
-        message: `Missing identity field: ${field}`,
-      };
-    }
+  let det = 0;
+  for (let identity of identity_settings.uniques) {
+    if (identity[identity]) det++;
+  }
+  if (!det) {
+    return {
+      ok: false,
+      message: `Missing identity fields: ${identity_settings.uniques.join(",")}`,
+    };
   }
 
   let Profiles = await db.folder("Profiles");
 
-  const or = identity_settings.uniques.map((field) => ({
-    [field]: identity[field],
-  }));
+  const or = identity_settings.uniques
+    .filter((field) => identity[field] !== undefined)
+    .map((field) => ({
+      [field]: identity[field],
+    }));
 
   let existing = await Profiles.findOne({
     profile: profile.profile,
@@ -1009,9 +1032,11 @@ const confirm_update_profile_identity = async (req) => {
 
   const identity = continuation.meta_payload.identity;
 
-  const or = identity_settings.uniques.map((field) => ({
-    [field]: identity[field],
-  }));
+  const or = identity_settings.uniques
+    .filter((field) => identity[field] !== undefined)
+    .map((field) => ({
+      [field]: identity[field],
+    }));
 
   let existing = await Profiles.findOne({
     profile: profile.profile,
@@ -1077,7 +1102,7 @@ const reset_password_by_old_password = async (req) => {
   let Profile_passwords = await db.folder("Profile_passwords");
 
   let prev_pass = await Profile_passwords.findOne({ profile: profile._id });
-  if (hash(old_password) !== prev_pass.key) {
+  if (old_password && hash(old_password) !== prev_pass?.key) {
     return {
       ok: false,
       status: 403,
@@ -1085,9 +1110,13 @@ const reset_password_by_old_password = async (req) => {
     };
   }
 
+  let pass_id = crypto.randomUUID();
   await Profile_passwords.updateOne(
-    { _id: prev_pass._id },
-    { $set: { key: hash(new_password) } },
+    { _id: prev_pass?._id || pass_id },
+    {
+      $set: { key: hash(new_password) },
+      $setOnInsert: { _id: pass_id, created: Date.now() },
+    },
   );
 
   return {

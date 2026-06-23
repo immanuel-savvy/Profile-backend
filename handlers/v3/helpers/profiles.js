@@ -49,6 +49,8 @@ const generate_otp = async ({
     otp += chars[idx];
   }
 
+  console.log(otp);
+
   const now = new Date();
 
   const expires_at = new Date(now.getTime() + expiry * 60 * 1000);

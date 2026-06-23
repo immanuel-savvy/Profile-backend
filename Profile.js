@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
-import GodProtocol from "godprotocol";
-
 dotenv.config();
+
+import GodProtocol from "godprotocol";
 
 import router from "./routes/index.js";
 import services from "./services/index.js";
