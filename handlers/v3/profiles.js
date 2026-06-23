@@ -263,7 +263,7 @@ const signup = async (req, opts) => {
     if (from === "signin") {
       creds = social;
     } else {
-      let creds = await social_auth(social, {
+      creds = await social_auth(social, {
         auth_cred: identity_settings?.socials?.[social.type],
       });
 
@@ -272,7 +272,7 @@ const signup = async (req, opts) => {
       }
     }
 
-    details = { ...creds };
+    details = { ...creds.data };
   }
 
   // Ensure unique identity fields are configured and provided
@@ -309,6 +309,25 @@ const signup = async (req, opts) => {
     }));
   const existing = await Profiles.findOne({ profile: profile_type, $or: or });
   if (existing) {
+    if (social) {
+      let session_object = await create_session_object(
+        existing,
+        platform,
+        req,
+        {
+          // meta_payload,
+          session_settings: settings?.session,
+        },
+      );
+
+      return {
+        ok: true,
+        message: "Sign-in successful",
+        data: existing,
+        token: session_object.token,
+      };
+    }
+
     return {
       ok: false,
       status: 409,
