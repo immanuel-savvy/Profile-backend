@@ -23,70 +23,105 @@ const generate_otp = async ({
 }) => {
   let otp = "";
 
-  const folder = await db.folder(`Otps:${sub}`);
+  let folder = await db.folder(`Otps:${sub}`);
 
   if (!Array.isArray(identity)) {
     identity = [identity];
   }
 
-  const charsets = {
+  let charsets = {
     num: "0123456789",
     alpha: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     alnum: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     hex: "0123456789abcdef",
   };
 
-  const chars = charsets[charset_type] || charsets.num;
+  let chars = charsets[charset_type] || charsets.num;
 
-  // SECURE RANDOM OTP
   for (let i = 0; i < length; i++) {
-    const bytes = new Uint8Array(1);
+    let bytes = new Uint8Array(1);
 
     crypto.getRandomValues(bytes);
 
-    const idx = bytes[0] % chars.length;
-
-    otp += chars[idx];
+    otp += chars[bytes[0] % chars.length];
   }
 
-  console.log(otp);
+  let now = Date.now();
 
-  const now = new Date();
+  let created = new Date(now);
 
-  const expires_at = new Date(now.getTime() + expiry * 60 * 1000);
+  let expires_at = new Date(now + expiry * 60 * 1000);
 
-  const doc = {
-    _id: crypto.randomUUID(),
-    identity,
-    key: hash(otp),
-    created: now,
-    expires_at,
-  };
-
-  // Match SAME identity set
-  const existing = await folder.findOne({
+  let existing = await folder.findOne({
     identity: { $all: identity },
   });
 
-  if (existing?._id) {
-    doc._id = existing._id;
+  let WINDOW_MS = 5 * 60 * 1000;
+  let MAX_REQUESTS = 5;
+
+  if (existing) {
+    let lastreset = existing.lastreset || now;
+
+    let withinWindow = now - lastreset < WINDOW_MS;
+
+    if (withinWindow && existing.total_requests >= MAX_REQUESTS) {
+      let remainingMs = WINDOW_MS - (now - lastreset);
+
+      let minutes = Math.floor(remainingMs / 60000);
+      let seconds = Math.ceil((remainingMs % 60000) / 1000);
+
+      return {
+        ok: false,
+        status: 429,
+        message: `Too many OTP requests. Try again in ${minutes}m ${seconds}s.`,
+      };
+    }
+  }
+
+  let doc = {
+    _id: existing?._id || crypto.randomUUID(),
+    identity,
+    key: hash(otp),
+    created,
+    expires_at,
+  };
+
+  let update = {
+    key: doc.key,
+    expires_at: doc.expires_at,
+  };
+
+  let payload = {
+    $set: update,
+
+    $setOnInsert: {
+      _id: doc._id,
+      identity: doc.identity,
+      created: doc.created,
+      total_requests: 1,
+      lastreset: now,
+    },
+  };
+
+  if (existing) {
+    let shouldResetWindow =
+      !existing.lastreset || now - existing.lastreset >= WINDOW_MS;
+
+    if (shouldResetWindow) {
+      payload.$set.lastreset = now;
+      payload.$set.total_requests = 1;
+    } else {
+      payload.$inc = {
+        total_requests: 1,
+      };
+    }
   }
 
   await folder.updateOne(
     {
       identity: { $all: identity },
     },
-    {
-      $set: {
-        key: doc.key,
-        expires_at: doc.expires_at,
-      },
-      $setOnInsert: {
-        _id: doc._id,
-        identity: doc.identity,
-        created: doc.created,
-      },
-    },
+    payload,
     {
       upsert: true,
     },
@@ -211,14 +246,35 @@ const validate_continuation = async (db, continuation_token, props) => {
     let otp_entry = await otp_folder.findOne({ _id: continuation_token });
 
     if (!otp_entry) {
+      await continuation_db.deleteOne({ _id: continuation._id });
+
       return { ok: false, message: "Invalid Token" };
     }
+
     if (otp_entry.expires_at < new Date()) {
+      await continuation_db.deleteOne({ _id: continuation._id });
+
       return { ok: false, status: 400, message: "OTP expired" };
     }
 
     if (otp_entry.key !== hash(otp)) {
-      return { ok: false, status: 400, message: "Incorrect OTP" };
+      const updated = await continuation_db.findOneAndUpdate(
+        { _id: continuation._id },
+        { $inc: { trial: 1 } },
+        { returnDocument: "after" },
+      );
+
+      let deleted;
+      if (updated?.trial >= 5) {
+        deleted = true;
+        await continuation_db.deleteOne({ _id: updated._id });
+      }
+
+      return {
+        ok: false,
+        status: 400,
+        message: deleted ? "Incorrect OTP. Resend" : "Incorrect OTP",
+      };
     }
     await otp_folder.deleteOne({ _id: otp_entry._id });
   } else if (continuation.type === "link") {
@@ -232,11 +288,12 @@ const validate_continuation = async (db, continuation_token, props) => {
       return { ok: false, status: 400, message: "Token invalid" };
     }
     if (token_entry.expires_at < new Date()) {
+      await Reset_tokens.deleteOne({ _id: token_entry._id });
       return { ok: false, status: 400, message: "Token expired" };
     }
-    if (token_entry.type !== "signin") {
-      return { ok: false, status: 400, message: "Invalid token type" };
-    }
+    // if (token_entry.type !== "signin") {
+    //   return { ok: false, status: 400, message: "Invalid token type" };
+    // }
 
     await Reset_tokens.deleteOne({ _id: token_entry._id });
   } else {
@@ -276,6 +333,10 @@ const two_fa_challenge = async ({
           expiry: two_fa_settings.two_factor_auth.otp?.expiry || 5,
           charset_type: two_fa_settings.two_factor_auth.otp?.charset || "alnum",
         });
+
+        if (!continuation?.ok) {
+          return continuation;
+        }
 
         if (identity_settings.uniques.includes("email") && profile.email) {
           signin_response = await (

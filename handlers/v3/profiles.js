@@ -262,6 +262,8 @@ const signup = async (req, opts) => {
     let creds;
     if (from === "signin") {
       creds = social;
+    } else if (from === "resend_otp") {
+      creds = details;
     } else {
       creds = await social_auth(social, {
         auth_cred: identity_settings?.socials?.[social.type],
@@ -575,7 +577,53 @@ const two_factor_signup = async (req) => {
   };
 };
 
-const forgot_password = async (req) => {
+const resend_2fa = async (req) => {
+  let { headers, body, db } = req;
+  let { platform } = headers;
+
+  let { continuation_token, sub_per } = body;
+
+  let Continuations = await db.folder("2fa_continuations"),
+    Profiles = await db.folder("Profiles");
+
+  let continuation = await Continuations.findOne({ _id: continuation_token });
+  if (!continuation) {
+    return {
+      ok: false,
+      message: "Invalid continuation token",
+      status: 400,
+    };
+  }
+
+  let res = { ok: false, status: 402, message: "Check sub_per" };
+
+  if (sub_per === "forgot_password") {
+    let profile = await Profiles.findOne({
+      _id: continuation.meta_payload?.profile_id,
+    });
+
+    res = await forgot_password(
+      { ...req, body: { profile_type: profile.profile } },
+      { profile },
+    );
+  } else if (sub_per === "signup") {
+    let meta_payload = continuation.meta_payload;
+    res = await signup({
+      ...req,
+      body: {
+        profile_type: meta_payload.new_profile?.profile,
+        details: meta_payload.new_profile,
+        password: meta_payload.password,
+      },
+    });
+  }
+
+  return res;
+};
+
+const forgot_password = async (req, opts) => {
+  let { profile } = opts || {};
+
   let { db, body, headers } = req;
   let { platform } = headers;
   let { identity, profile_type } = body;
@@ -603,22 +651,25 @@ const forgot_password = async (req) => {
     };
   }
 
-  let query = { profile: profile_type };
-  for (let field of identity_settings?.uniques) {
-    if (identity[field]) query[field] = identity[field];
-  }
-
-  if (Object.keys(query).length === 1) {
-    return {
-      ok: false,
-      status: 400,
-      message: `Missing identities field(s) of: ${identity_settings.uniques.join(",")}`,
-    };
-  }
-  let Profiles = await db.folder("Profiles");
-  let profile = await Profiles.findOne(query);
   if (!profile) {
-    return { ok: false, status: 404, message: "Profile not found" };
+    let query = { profile: profile_type };
+    for (let field of identity_settings?.uniques) {
+      if (identity[field]) query[field] = identity[field];
+    }
+
+    if (Object.keys(query).length === 1) {
+      return {
+        ok: false,
+        status: 400,
+        message: `Missing identities field(s) of: ${identity_settings.uniques.join(",")}`,
+      };
+    }
+
+    let Profiles = await db.folder("Profiles");
+    profile = await Profiles.findOne(query);
+    if (!profile) {
+      return { ok: false, status: 404, message: "Profile not found" };
+    }
   }
 
   let forgot_password_settings = settings?.forgot_password?.two_fa_settings;
@@ -1178,6 +1229,7 @@ export {
   update_profile_identity,
   confirm_update_profile_identity,
   validate_continuation_token,
+  resend_2fa,
   //
   get_platform_profile,
 };

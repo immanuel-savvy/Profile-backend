@@ -21,6 +21,7 @@ import {
 import {
   confirm_update_profile_identity,
   forgot_password,
+  resend_2fa,
   reset_password,
   reset_password_by_old_password,
   signin,
@@ -564,6 +565,16 @@ const routes = {
           required: true,
           type: "string",
         },
+      },
+    },
+  },
+  resend_2fa: {
+    handler: resend_2fa,
+    security: "api_key",
+    schema: {
+      body: {
+        continuation_token: { required: true, type: "string" },
+        sub_per: { required: true, type: "string" },
       },
     },
   },
