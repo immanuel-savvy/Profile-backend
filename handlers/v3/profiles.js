@@ -424,7 +424,13 @@ const signup = async (req, opts) => {
       to: newProfile.email,
       content: {
         template: welcome_notification?.template,
-        params: { profile: newProfile },
+        params: {
+          profile: {
+            ...newProfile,
+            firstname:
+              newProfile.firstname || newProfile?.fullname?.split(" ")?.[0],
+          },
+        },
       },
     });
   }
