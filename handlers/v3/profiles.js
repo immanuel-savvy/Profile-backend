@@ -848,7 +848,8 @@ const update_profile = async (req) => {
 
   let { profile, platform } = headers;
 
-  let { updates = {} } = body;
+  let { updates, data } = body;
+  if (!updates) updates = data;
 
   if (!updates || typeof updates !== "object") {
     return {

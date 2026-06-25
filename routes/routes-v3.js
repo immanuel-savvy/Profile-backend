@@ -681,10 +681,20 @@ const routes = {
     security: "auth_token",
     schema: {
       body: {
-        updates: {
-          type: "object",
-          required: true,
+        // patch
+        $logic: {
+          or: [
+            {
+              properties: ["updates", "data"],
+              required: true,
+              type: "object",
+            },
+          ],
         },
+        // updates: {
+        //   type: "object",
+        //   required: true,
+        // },
       },
     },
   },
