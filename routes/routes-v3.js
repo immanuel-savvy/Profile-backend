@@ -1,4 +1,8 @@
 import {
+  refresh_platform_key,
+  refresh_profile_key,
+} from "../handlers/v3/api_keys.js";
+import {
   accept_transfer,
   delete_transfer,
   get_platform,
@@ -787,6 +791,16 @@ const routes = {
         new_password: { required: true, type: "string" },
       },
     },
+  },
+
+  // API Keys
+  refresh_platform_key: {
+    handler: refresh_platform_key,
+    security: "api_key",
+  },
+  refresh_profile_key: {
+    handler: refresh_profile_key,
+    security: "api_key",
   },
 };
 

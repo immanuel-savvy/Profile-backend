@@ -103,29 +103,42 @@ const generate_otp = async ({
     },
   };
 
-  if (existing) {
-    let shouldResetWindow =
+  if (!existing) {
+    await folder.insertOne({
+      _id: doc._id,
+      identity,
+      key: doc.key,
+      created,
+      expires_at,
+      total_requests: 1,
+      lastreset: now,
+    });
+  } else {
+    const shouldResetWindow =
       !existing.lastreset || now - existing.lastreset >= WINDOW_MS;
 
-    if (shouldResetWindow) {
-      payload.$set.lastreset = now;
-      payload.$set.total_requests = 1;
-    } else {
-      payload.$inc = {
-        total_requests: 1,
-      };
-    }
+    await folder.updateOne(
+      { _id: existing._id },
+      shouldResetWindow
+        ? {
+            $set: {
+              key: doc.key,
+              expires_at,
+              total_requests: 1,
+              lastreset: now,
+            },
+          }
+        : {
+            $set: {
+              key: doc.key,
+              expires_at,
+            },
+            $inc: {
+              total_requests: 1,
+            },
+          },
+    );
   }
-
-  await folder.updateOne(
-    {
-      identity: { $all: identity },
-    },
-    payload,
-    {
-      upsert: true,
-    },
-  );
 
   return {
     ok: true,

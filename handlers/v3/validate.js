@@ -2,8 +2,12 @@ const validate = async (req) => {
   let { headers, db } = req;
   let api_key = headers["x-api-key"];
 
-  let Platforms = await db.folder("Platforms");
-  let Tokens = await db.folder("Platform_tokens");
+  let is_profile = api_key.startsWith("p");
+
+  let Identities = await db.folder(is_profile ? "Profiles" : "Platforms");
+  let Tokens = await db.folder(
+    is_profile ? "Profile_tokens" : "Platform_tokens",
+  );
 
   let token_data = await Tokens.findOne({ token: api_key });
   if (!token_data) {
@@ -14,11 +18,14 @@ const validate = async (req) => {
     };
   }
 
-  let platform = await Platforms.findOne({ _id: token_data.platform });
-  if (!platform) {
+  let data = await Identities.findOne({
+    _id: is_profile ? token_data.profile : token_data.platform,
+  });
+
+  if (!data) {
     return {
       ok: false,
-      message: "Platform is missing",
+      message: "Api Key does not match any identity.",
       status: 401,
     };
   }
@@ -26,7 +33,7 @@ const validate = async (req) => {
   return {
     ok: true,
     message: "Token valid",
-    data: { platform },
+    data: { [is_profile ? "profile" : "platform"]: data },
   };
 };
 
