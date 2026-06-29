@@ -800,7 +800,7 @@ const routes = {
   },
   refresh_profile_key: {
     handler: refresh_profile_key,
-    security: "api_key",
+    security: "auth_token",
   },
 };
 

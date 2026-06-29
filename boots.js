@@ -13,13 +13,18 @@ const boots = async () => {
   });
 
   let Profiles = await db.collection("Profiles");
+  // console.log(
+  //   await Profiles.findOne({
+  //     profile: "e2681f31-082a-4dc4-86bd-ce1f43274e97",
+  //     email: "immanuelsavvy@gmail.com",
+  //   }),
+  // );
 
   console.log(
     await (
       await db.collection("Sessions")
     ).findOne({
-      token:
-        "7c704861c24b39ffb698935c25a3ec574aeb2cf4080375a7e890104ba0e1fb5572203fbc03b44a47bfcc9b738546c511",
+      profile: "48d3f3f3-91a6-44b5-86d3-c446b6baeca6",
     }),
   );
   // let V1_profiles = await PROFILES();
