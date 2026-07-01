@@ -198,6 +198,7 @@ const get_profile_platforms = async (req) => {
       limit,
       skip,
       page,
+      pages: Math.ceil(total / limit),
     },
     data: items,
   };
