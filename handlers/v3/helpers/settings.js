@@ -40,6 +40,8 @@ const get_settings = async ({ req, body, profile, options }) => {
     }
   }
 
+  console.log("Settings Response:", JSON.stringify(res, null, 2));
+
   // console.log(JSON.stringify(res, null, 2));
 
   if (full) return res;

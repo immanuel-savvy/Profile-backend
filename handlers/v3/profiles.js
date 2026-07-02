@@ -80,6 +80,8 @@ const signin = async (req) => {
     body: { category: [platform._id], key: ["identity", "signin", "session"] },
   });
 
+  console.log(settings, "heyy");
+
   let identity_settings = settings?.identity;
 
   if (!identity_settings) {

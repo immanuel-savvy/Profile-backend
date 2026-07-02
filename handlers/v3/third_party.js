@@ -243,6 +243,7 @@ const get_token = async (req) => {
   let { headers, db, body } = req;
   let { platform } = headers;
 
+  console.log("get_token called with body:", body, headers);
   let { profile, platform_uri } = body;
 
   let Sessions = await db.folder("Sessions");

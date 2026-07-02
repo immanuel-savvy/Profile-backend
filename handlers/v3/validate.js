@@ -2,7 +2,7 @@ const validate = async (req) => {
   let { headers, db } = req;
   let api_key = headers["x-api-key"];
 
-  let is_profile = api_key.startsWith("p");
+  let is_profile = api_key.startsWith("p") && api_key.length > 20;
 
   let Identities = await db.folder(is_profile ? "Profiles" : "Platforms");
   let Tokens = await db.folder(
@@ -131,15 +131,15 @@ const third_party_me = async (req) => {
     };
   }
 
-  if (session && session.created < Date.now() - 1000 * 60 * 60 * 24) {
-    await Sessions.deleteOne({ _id: session._id });
-    return {
-      ok: false,
-      status_code: "session_expired",
-      message: "Session expired",
-      status: 401,
-    };
-  }
+  // if (session && session.created < Date.now() - 1000 * 60 * 60 * 24) {
+  //   await Sessions.deleteOne({ _id: session._id });
+  //   return {
+  //     ok: false,
+  //     status_code: "session_expired",
+  //     message: "Session expired",
+  //     status: 401,
+  //   };
+  // }
 
   let Profiles = await db.folder("Profiles");
   let profile = await Profiles.findOne({ _id: session.profile });

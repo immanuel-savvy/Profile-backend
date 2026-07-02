@@ -18,11 +18,11 @@ const services = () => {
     },
 
     //
-    cache: {
-      url: DEV ? "http://localhost:4014" : "https://cache1.rushbox.biz",
-      uri: "cache.savvyaisolution.com",
-      api_key: process.env.CACHE_PROFILE_KEY,
-    },
+    // cache: {
+    //   url: DEV ? "http://localhost:4014" : "https://cache1.rushbox.biz",
+    //   uri: "cache.savvyaisolution.com",
+    //   api_key: process.env.CACHE_PROFILE_KEY,
+    // },
   };
 };
 
