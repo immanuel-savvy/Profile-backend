@@ -2,6 +2,87 @@ const validate = async (req) => {
   let { headers, db } = req;
   let api_key = headers["x-api-key"];
 
+  if (api_key?.startsWith("o")) {
+    let One_time_tokens = await db.folder("One_time_tokens");
+    let split = api_key.split(".");
+    api_key = split[0];
+
+    let token_data = await One_time_tokens.findOne({ token: api_key });
+    if (!token_data) {
+      return {
+        ok: false,
+        message: "Token is not valid",
+        status: 401,
+      };
+    }
+
+    if (token_data.updated < Date.now() - token_data.duration) {
+      await One_time_tokens.deleteOne({ _id: token_data._id });
+      return {
+        ok: false,
+        message: "Token has expired",
+        status: 401,
+      };
+    }
+
+    if (token_data.limit === 0) {
+      await One_time_tokens.deleteOne({ _id: token_data._id });
+      return {
+        ok: false,
+        message: "Token has been used up",
+        status: 401,
+      };
+    }
+
+    if (
+      token_data.endpoints?.length &&
+      !token_data.endpoints.includes(split[1])
+    ) {
+      return {
+        ok: false,
+        message: "Unauthorised endpoint",
+        status_code: "unauthorised_endpoint",
+        status: 401,
+      };
+    }
+
+    if (token_data?.limit !== -1) {
+      let updated_token = await One_time_tokens.findOneAndUpdate(
+        { _id: token_data._id },
+        { $inc: { limit: -1 } },
+        { returnDocument: "after" }, // MongoDB Driver v4+
+      );
+
+      if (updated_token.limit < -1) {
+        await One_time_tokens.deleteOne({ _id: token_data._id });
+
+        return {
+          ok: false,
+          message: "Invalid token",
+          status: 400,
+          status_code: "invalid_token",
+        };
+      }
+    }
+
+    let Identities = await db.folder("Profiles");
+    let data = await Identities.findOne({ _id: token_data.profile });
+
+    if (!data) {
+      return {
+        ok: false,
+        message: "Api Key does not match any identity.",
+        status: 401,
+      };
+    }
+
+    return {
+      ok: true,
+      message: "Token valid",
+      data: { profile: data },
+    };
+  }
+
   let is_profile = api_key.startsWith("p") && api_key.length > 20;
 
   let Identities = await db.folder(is_profile ? "Profiles" : "Platforms");

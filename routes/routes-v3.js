@@ -1,6 +1,15 @@
 import {
+  generate_ott,
+  refresh_ott,
   refresh_platform_key,
   refresh_profile_key,
+  retrieve_platform_key,
+  retrieve_platform_keys,
+  retrieve_profile_key,
+  retrieve_profile_keys,
+  revoke_ott,
+  revoke_platform_key,
+  revoke_profile_key,
 } from "../handlers/v3/api_keys.js";
 import {
   accept_transfer,
@@ -35,6 +44,7 @@ import {
   two_factor_signup,
   update_profile,
   update_profile_identity,
+  update_social_identity,
   validate_continuation_token,
 } from "../handlers/v3/profiles.js";
 import { third_party_signup } from "../handlers/v3/signup_with.js";
@@ -736,6 +746,16 @@ const routes = {
     },
   },
 
+  update_social_identity: {
+    handler: update_social_identity,
+    security: "auth_token",
+    schema: {
+      body: {
+        social: { type: "object", required: true },
+      },
+    },
+  },
+
   // Webhooks
   update_webhook: {
     handler: update_webhook,
@@ -797,10 +817,142 @@ const routes = {
   refresh_platform_key: {
     handler: refresh_platform_key,
     security: "api_key",
+    schema: {
+      body: {
+        name: { type: "string", default_value: "" },
+      },
+    },
   },
   refresh_profile_key: {
     handler: refresh_profile_key,
     security: "auth_token",
+    schema: {
+      body: {
+        name: { type: "string", default_value: "" },
+      },
+    },
+  },
+  retrieve_platform_key: {
+    handler: retrieve_platform_key,
+    security: "api_key",
+    schema: {
+      body: {
+        $logic: {
+          or: [
+            {
+              properties: ["name", "token"],
+              required: true,
+              type: "string",
+            },
+          ],
+        },
+      },
+    },
+  },
+  retrieve_profile_key: {
+    handler: retrieve_profile_key,
+    security: "api_key",
+    schema: {
+      body: {
+        $logic: {
+          or: [
+            {
+              properties: ["name", "token"],
+              required: true,
+              type: "string",
+            },
+          ],
+        },
+      },
+    },
+  },
+  retrieve_platform_keys: {
+    handler: retrieve_platform_keys,
+    security: "api_key",
+    schema: {
+      body: {
+        limit: { type: "number", default_value: 20 },
+        page: { type: "number", default_value: 1 },
+      },
+    },
+  },
+  retrieve_profile_keys: {
+    handler: retrieve_profile_keys,
+    security: "auth_token",
+    schema: {
+      body: {
+        limit: { type: "number", default_value: 20 },
+        page: { type: "number", default_value: 1 },
+      },
+    },
+  },
+  revoke_platform_key: {
+    handler: revoke_platform_key,
+    security: "api_key",
+    schema: {
+      body: {
+        $logic: {
+          or: [
+            {
+              properties: ["name", "token"],
+              required: true,
+              type: "string",
+            },
+          ],
+        },
+      },
+    },
+  },
+  revoke_profile_key: {
+    handler: revoke_profile_key,
+    security: "auth_token",
+    schema: {
+      body: {
+        $logic: {
+          or: [
+            {
+              properties: ["name", "token"],
+              required: true,
+              type: "string",
+            },
+          ],
+        },
+      },
+    },
+  },
+
+  revoke_ott: {
+    handler: revoke_ott,
+    security: "auth_token",
+    schema: {
+      body: {
+        token: { required: true, type: "string" },
+      },
+    },
+  },
+  generate_ott: {
+    handler: generate_ott,
+    security: "auth_token",
+    schema: {
+      body: {
+        name: { type: "string", default_value: "" },
+        limit: { type: "number", default_value: 1 },
+        duration: { type: "number", default_value: -1 },
+        endpoints: { type: "array", default_value: [] },
+      },
+    },
+  },
+  refresh_ott: {
+    handler: refresh_ott,
+    security: "auth_token",
+    schema: {
+      body: {
+        token: { type: "string", required: true },
+        limit: { type: "number", default_value: 1 },
+        duration: { type: "number", default_value: -1 },
+        endpoints: { type: "array", default_value: [] },
+      },
+    },
   },
 };
 

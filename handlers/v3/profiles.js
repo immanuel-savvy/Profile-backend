@@ -59,9 +59,9 @@ const social_auth = async (social, { auth_cred }) => {
 };
 
 const signin = async (req) => {
-  let { db } = req;
-  let { platform } = req.headers;
-  let { credentials, social, profile_type, meta_payload } = req.body;
+  let { db, body, headers } = req;
+  let { platform } = headers;
+  let { credentials, social, profile_type, meta_payload } = body;
 
   let Profile_types = await db.folder("Profile_types");
   let profile_type_entry = await Profile_types.findOne({
@@ -79,8 +79,6 @@ const signin = async (req) => {
     req,
     body: { category: [platform._id], key: ["identity", "signin", "session"] },
   });
-
-  console.log(settings, "heyy");
 
   let identity_settings = settings?.identity;
 
@@ -130,7 +128,12 @@ const signin = async (req) => {
 
       return res;
     }
-    return { ok: false, status: 401, message: "Invalid credentials" };
+    return {
+      ok: false,
+      status: 401,
+      status_code: "invalid_credentials",
+      message: "Invalid credentials",
+    };
   }
 
   if (!social) {
@@ -745,6 +748,7 @@ const validate_continuation_token = async (req) => {
     sub,
     continuation: validation.continuation,
   });
+
   return {
     ok: true,
     message: "Token validated",
@@ -952,7 +956,7 @@ const update_profile_identity = async (req) => {
   let settings = await get_settings({
     req,
     body: {
-      category: [profile.profile],
+      category: [profile.platform],
       key: ["identity", "update_profile_identity"],
     },
   });
@@ -1074,6 +1078,40 @@ const update_profile_identity = async (req) => {
     status: 200,
     message: "Identity updated successfully",
     data: updated_profile,
+  };
+};
+
+const update_social_identity = async (req) => {
+  let { body, db, headers } = req;
+  let { profile } = headers;
+  let { social } = body;
+
+  let settings = await get_settings({
+    req,
+    body: {
+      category: profile.platform,
+      keys: ["identity"],
+    },
+  });
+  let identity_settings = settings?.identity;
+
+  let social_settings = identity_settings?.socials?.[social.type];
+
+  let social_res = await social_auth(social, { auth_cred: social_settings });
+
+  if (!social_res.ok) {
+    return social_res;
+  }
+
+  await (
+    await db.folder("Profiles")
+  ).updateOne({ _id: profile._id }, { $set: social_res.data });
+
+  return {
+    ok: true,
+    data: { ...profile, ...social_res.data },
+    status_code: "profile_updated",
+    message: "Profile updated",
   };
 };
 
@@ -1236,6 +1274,7 @@ export {
   refresh_token,
   update_profile,
   update_profile_identity,
+  update_social_identity,
   confirm_update_profile_identity,
   validate_continuation_token,
   resend_2fa,
