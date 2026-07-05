@@ -48,15 +48,28 @@ const refresh_profile_key = async (req) => {
 
   let Profile_tokens = await db.folder("Profile_tokens");
 
+  if (await Profile_tokens.findOne({ name, profile: profile._id })) {
+    return {
+      ok: false,
+      message: "Key name already in use.",
+      status: 401,
+    };
+  }
+
   let _id = crypto.randomUUID();
-  await Profile_tokens.insertOne({
-    profile: profile._id,
-    name,
-    token,
-    updated: Date.now(),
-    created: Date.now(),
-    _id,
-  });
+  await Profile_tokens.insertOne(
+    {
+      profile: profile._id,
+
+      name,
+      token,
+      updated: Date.now(),
+
+      created: Date.now(),
+      _id,
+    },
+    { upsert: true },
+  );
 
   return {
     ok: true,
