@@ -1089,10 +1089,11 @@ const update_social_identity = async (req) => {
   let settings = await get_settings({
     req,
     body: {
-      category: profile.platform,
-      keys: ["identity"],
+      category: [profile.platform],
+      key: ["identity"],
     },
   });
+
   let identity_settings = settings?.identity;
 
   let social_settings = identity_settings?.socials?.[social.type];
@@ -1101,6 +1102,7 @@ const update_social_identity = async (req) => {
 
   if (!social_res.ok) {
     return social_res;
+  } else {
   }
 
   await (

@@ -14,13 +14,10 @@ const get_settings = async ({ req, body, profile, options }) => {
 
   body.category.push("general");
 
-  // console.log(profile);
-
   let res = await (
     await req.services("settings")
   ).call("get_settings", body, profile && { profile });
 
-  // console.log(res, "hmmm");
   if (res.ok) {
     const categories = Object.keys(res.data || {});
 
@@ -40,9 +37,7 @@ const get_settings = async ({ req, body, profile, options }) => {
     }
   }
 
-  console.log("Settings Response:", JSON.stringify(res, null, 2));
-
-  // console.log(JSON.stringify(res, null, 2));
+  // console.log("Settings Response:", JSON.stringify(res, null, 2));
 
   if (full) return res;
 
