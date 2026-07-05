@@ -49,23 +49,14 @@ const refresh_profile_key = async (req) => {
   let Profile_tokens = await db.folder("Profile_tokens");
 
   let _id = crypto.randomUUID();
-  await Profile_tokens.updateOne(
-    {
-      profile: profile._id,
-    },
-    {
-      $set: {
-        name,
-        token,
-        updated: Date.now(),
-      },
-      $setOnInsert: {
-        created: Date.now(),
-        _id,
-      },
-    },
-    { upsert: true },
-  );
+  await Profile_tokens.insertOne({
+    profile: profile._id,
+    name,
+    token,
+    updated: Date.now(),
+    created: Date.now(),
+    _id,
+  });
 
   return {
     ok: true,
@@ -187,8 +178,8 @@ const retrieve_profile_keys = async (req) => {
   let Profile_tokens = await db.folder("Profile_tokens");
 
   let tokens = await Profile_tokens.find({ profile: profile._id })
-    .limit(limit)
     .skip((page - 1) * limit)
+    .limit(limit)
     .toArray();
 
   return {
