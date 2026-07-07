@@ -249,7 +249,7 @@ const transfer_platform = async (req) => {
   ) {
     return {
       ok: false,
-      message: "Invalid recipient",
+      message: "Recipient must be of Identity platform type",
       response_code: "invalid_recipient",
     };
   }

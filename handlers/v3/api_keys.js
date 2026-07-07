@@ -38,7 +38,51 @@ const refresh_platform_key = async (req) => {
   };
 };
 
-const refresh_profile_key = async (req) => {
+const refresh_profile_key = async (async) => {
+  let { headers, db, body } = req;
+
+  let { profile } = headers;
+  let { name } = body;
+
+  let token = crypto.randomBytes(48).toString("hex");
+  token = `p${token.slice(0, -1)}`;
+
+  let Profile_tokens = await db.folder("Profile_tokens");
+
+  let existing = await Profile_tokens.findOne({ profile: profile._id });
+
+  let _id = existing?._id || crypto.randomUUID();
+
+  await Profile_tokens.updateOne(
+    { profile: profile._id },
+    {
+      $set: {
+        name,
+        token,
+        updated: Date.now(),
+      },
+      $setOnInsert: {
+        _id,
+        profile: profile._id,
+        created: Date.now(),
+      },
+    },
+    {
+      upsert: true,
+    },
+  );
+
+  return {
+    ok: true,
+    message: existing ? "Token refreshed" : "Token created",
+    data: {
+      token,
+      _id,
+    },
+  };
+};
+
+const create_profile_key = async (req) => {
   let { headers, db, body } = req;
 
   let { profile } = headers;
@@ -57,23 +101,20 @@ const refresh_profile_key = async (req) => {
   }
 
   let _id = crypto.randomUUID();
-  await Profile_tokens.insertOne(
-    {
-      profile: profile._id,
+  await Profile_tokens.insertOne({
+    profile: profile._id,
 
-      name,
-      token,
-      updated: Date.now(),
+    name,
+    token,
+    updated: Date.now(),
 
-      created: Date.now(),
-      _id,
-    },
-    { upsert: true },
-  );
+    created: Date.now(),
+    _id,
+  });
 
   return {
     ok: true,
-    message: "Token refreshed",
+    message: "Token created",
     data: {
       token,
       _id,
@@ -313,6 +354,7 @@ export {
   revoke_profile_key,
   retrieve_profile_key,
   retrieve_profile_keys,
+  create_profile_key,
   retrieve_platform_key,
   revoke_platform_key,
   retrieve_platform_keys,

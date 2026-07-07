@@ -1,4 +1,5 @@
 import {
+  create_profile_key,
   generate_ott,
   refresh_ott,
   refresh_platform_key,
@@ -832,6 +833,15 @@ const routes = {
       },
     },
   },
+  create_profile_key: {
+    handler: create_profile_key,
+    security: "auth_token",
+    schema: {
+      body: {
+        name: { type: "string", default_value: "" },
+      },
+    },
+  },
   retrieve_platform_key: {
     handler: retrieve_platform_key,
     security: "api_key",
@@ -851,7 +861,7 @@ const routes = {
   },
   retrieve_profile_key: {
     handler: retrieve_profile_key,
-    security: "api_key",
+    security: "auth_token",
     schema: {
       body: {
         $logic: {
