@@ -38,7 +38,7 @@ const refresh_platform_key = async (req) => {
   };
 };
 
-const refresh_profile_key = async (async) => {
+const refresh_profile_key = async (req) => {
   let { headers, db, body } = req;
 
   let { profile } = headers;
