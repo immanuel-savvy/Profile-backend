@@ -27,6 +27,7 @@ import {
   add_profile,
   create_profile_type,
   edit_profile,
+  get_profile,
   get_profile_type,
   get_profile_types,
   get_profiles,
@@ -484,6 +485,18 @@ const routes = {
         page: {
           type: "number",
           default_value: 1,
+        },
+      },
+    },
+  },
+  get_profile: {
+    handler: get_profile,
+    security: "api_key",
+    schema: {
+      body: {
+        _id: {
+          type: "string",
+          required: true,
         },
       },
     },

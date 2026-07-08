@@ -983,8 +983,8 @@ const update_profile_identity = async (req) => {
   }
 
   let det = 0;
-  for (let identity of identity_settings.uniques) {
-    if (identity[identity]) det++;
+  for (let id of identity_settings.uniques) {
+    if (identity[id]) det++;
   }
   if (!det) {
     return {

@@ -186,6 +186,22 @@ const update_profile_type = async (req) => {
   };
 };
 
+const get_profile = async (req) => {
+  let { headers, db, body } = req;
+  let { platform } = headers;
+  let { _id } = body;
+
+  let Profiles = await db.folder("Profiles");
+
+  let profile = await Profiles.findOne({ _id });
+
+  return {
+    ok: !!profile,
+    message: profile ? "Profile found" : "Profile not found",
+    data: profile,
+  };
+};
+
 const get_profiles = async (req) => {
   let { headers, db, body } = req;
   let { platform } = headers;
@@ -371,6 +387,7 @@ export {
   get_profile_types,
   get_profile_type,
   update_profile_type,
+  get_profile,
   edit_profile,
   add_profile,
 };
