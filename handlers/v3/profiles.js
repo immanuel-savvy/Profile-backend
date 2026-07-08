@@ -158,6 +158,7 @@ const signin = async (req) => {
         profile_type: profile_type_entry,
         identity_settings,
         meta_payload,
+        channel: meta_payload?.channel,
         otp_sub: `${profile_type}_signin`,
         template: {
           otp: "otp-2fa-signin",
@@ -237,7 +238,7 @@ const signup = async (req, opts) => {
   let { db, body, headers } = req;
   let { platform } = headers;
 
-  let { details, social, profile_type, password } = body;
+  let { details, social, profile_type, password, meta_payload } = body;
 
   let profile_type_entry = await (
     await db.folder("Profile_types")
@@ -375,6 +376,7 @@ const signup = async (req, opts) => {
         profile: details,
         identity_settings,
         two_fa_settings,
+        channel: meta_payload?.channel,
         profile_type: profile_type_entry,
         meta_payload: { new_profile: newProfile, password },
         platform,
