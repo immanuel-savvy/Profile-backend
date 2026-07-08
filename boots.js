@@ -12,18 +12,22 @@ const boots = async () => {
     db_name: "v3-profiles",
   });
 
-  let Profiles = await db.collection("Profiles");
+  // let Profiles = await db.collection("Profiles");
   // console.log(
-  //   await Profiles.deleteOne({
-  //     _id: "b11bea06-b169-402c-9cb1-88baa8e2a942",
+  //   await Profiles.findOne({
+  //     phone: "2348148253812",
+  //     profile: "9ad3df92-6512-4641-ab01-52af6b5a4c96",
   //   }),
   // );
 
   // console.log(
   //   await (
-  //     await db.collection("Sessions")
-  //   ).findOne({
-  //     profile: "48d3f3f3-91a6-44b5-86d3-c446b6baeca6",
+  //     await db.collection("Profile_passwords")
+  //   ).insertOne({
+  //     profile: "f748c829-6451-4c3d-aa6e-f192ae1577a6",
+  //     key: hash("rushbaby"),
+  //     _id: crypto.randomUUID(),
+  //     created: Date.now(),
   //   }),
   // );
   // let V1_profiles = await PROFILES();

@@ -435,16 +435,16 @@ const signup = async (req, opts) => {
             },
           };
     }
-
-    let Profile_passwords = await db.folder("Profile_passwords");
-
-    await Profile_passwords.insertOne({
-      _id: crypto.randomUUID(),
-      profile: newProfile._id,
-      key: hash(password),
-      created: Date.now(),
-    });
   }
+
+  let Profile_passwords = await db.folder("Profile_passwords");
+
+  await Profile_passwords.insertOne({
+    _id: crypto.randomUUID(),
+    profile: newProfile._id,
+    key: hash(password),
+    created: Date.now(),
+  });
 
   let res = await Profiles.insertOne(newProfile);
 
