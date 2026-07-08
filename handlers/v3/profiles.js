@@ -1025,8 +1025,9 @@ const update_profile_identity = async (req) => {
   if (update_settings?.two_fa_settings?.enabled) {
     let continuation = await two_fa_challenge({
       req,
-      profile,
+      profile: { ...profile, ...identity },
       identity_settings,
+      channel: identity.email ? "email" : "phone",
       profile_type: await (
         await db.folder("Profile_types")
       ).findOne({ _id: profile.profile }),
@@ -1153,7 +1154,7 @@ const confirm_update_profile_identity = async (req) => {
   let settings = await get_settings({
     req,
     body: {
-      category: [profile.profile],
+      category: [profile.platform],
       key: ["identity"],
     },
   });

@@ -326,6 +326,7 @@ const two_fa_challenge = async ({
   platform,
   profile_type,
   meta_payload,
+  channel,
   otp_sub,
   template = {},
 }) => {
@@ -351,7 +352,11 @@ const two_fa_challenge = async ({
           return continuation;
         }
 
-        if (identity_settings.uniques.includes("email") && profile.email) {
+        if (
+          channel !== "phone" &&
+          identity_settings.uniques.includes("email") &&
+          profile.email
+        ) {
           signin_response = await (
             await req.services("aimail")
           ).call(
