@@ -12,50 +12,84 @@ import { OAuth2Client } from "google-auth-library";
 const social_auth = async (social, { auth_cred }) => {
   let { meta, type, data } = social;
 
-  let os = meta?.os || "android";
+  const os = meta?.os || "android";
 
   if (type === "google") {
-    let token = (auth_cred?.[os] || auth_cred?.["default"])?.token;
-    const serv = new OAuth2Client(token);
+    try {
+      const token = (auth_cred?.[os] || auth_cred?.default)?.token;
+      const client = new OAuth2Client(token);
 
-    // 1. Verify Google ID token
-    const ticket = await serv.verifyIdToken({
-      idToken: data.idToken,
-      audience: token,
-    });
-
-    const payload = ticket.getPayload();
-
-    if (!payload) {
-      return res.json({
-        ok: false,
-        message: "Could not verify Google ID token",
+      const ticket = await client.verifyIdToken({
+        idToken: data.idToken,
+        audience: token,
       });
-    }
 
-    const email = payload.email?.trim().toLowerCase();
-    const firstname = payload.given_name || payload.givenName || "";
-    const lastname = payload.family_name || payload.familyName || "";
-    const picture = payload.picture || payload.photo;
+      const payload = ticket.getPayload();
 
-    if (!email) {
+      if (!payload) {
+        return {
+          ok: false,
+          status: 401,
+          message: "Unable to verify your Google account.",
+        };
+      }
+
+      const email = payload.email?.trim().toLowerCase();
+
+      if (!email) {
+        return {
+          ok: false,
+          status: 400,
+          message: "Your Google account does not have a valid email address.",
+        };
+      }
+
+      const firstname = payload.given_name || "";
+      const lastname = payload.family_name || "";
+
+      return {
+        ok: true,
+        data: {
+          email,
+          firstname,
+          lastname,
+          image: payload.picture,
+          fullname: `${firstname} ${lastname}`.trim(),
+        },
+      };
+    } catch (err) {
+      console.error("Google authentication failed:", err);
+
+      if (
+        err.message.includes("Token used too late") ||
+        err.message.includes("Token expired")
+      ) {
+        return {
+          ok: false,
+          status: 401,
+          code: "TOKEN_EXPIRED",
+          message:
+            "Your Google sign-in session has expired. Please sign in with Google again.",
+        };
+      }
+
       return {
         ok: false,
-        message: "Google account does not contain a valid email",
+        status: 401,
+        code: "GOOGLE_AUTH_FAILED",
+        message:
+          "We couldn't verify your Google account. Please try signing in again.",
       };
     }
-
-    return {
-      ok: true,
-      data: {
-        email,
-        firstname,
-        lastname,
-        image: picture,
-        fullname: `${firstname} ${lastname}`,
-      },
-    };
+  } else if (type === "apple") {
+  } else if (type === "facebook") {
   }
+
+  return {
+    ok: false,
+    status: 400,
+    message: "Unsupported social authentication provider.",
+  };
 };
 
 const signin = async (req) => {
