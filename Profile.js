@@ -2,9 +2,9 @@ import dotenv from "dotenv";
 dotenv.config();
 
 import GodProtocol from "godprotocol";
+import identity from "@web4.0/identity";
 
-import router from "./routes/index.js";
-import services from "./services/index.js";
+import services_config, { gp_services_config } from "./services.config.js";
 
 let gp = new GodProtocol({
   platform_uri: process.env.PLATFORM_URI,
@@ -13,10 +13,20 @@ let gp = new GodProtocol({
     db_name: "v3-profiles",
     db_url: process.env.MONGODB_URI,
   },
+  server: {
+    domain: process.env.DEV
+      ? "http://localhost:4000"
+      : "https://profiles-api.savvyaisolution.com",
+  },
+  capabilities: gp_services_config,
 });
 
-await router(gp);
+await identity.router(gp, { services_config });
 
-await gp.load_services(services);
+gp.on_start((gp) => {
+  console.log(Object.keys(gp.route_table.versions));
+});
+
+gp.boot();
 
 export default gp.on_request;

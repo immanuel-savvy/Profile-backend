@@ -1,5 +1,5 @@
 import { Mongo } from "@godprotocol/repositories";
-import { Platform_profile_type_id } from "./handlers/v2/platform.js";
+import { Platform_profile_type_id } from "./handlers/v3/platform.js";
 import { hash } from "./utils/hash.js";
 import { PROFILE_PASSWORDS, PROFILES } from "./ds/folders.js";
 
@@ -12,9 +12,9 @@ const boots = async () => {
     db_name: "v3-profiles",
   });
 
-  // let Profiles = await db.collection("Profiles");
+  let Profiles = await db.collection("Profiles");
   // console.log(
-  //   await Profiles.findOne({
+  //   await Profiles.deleteOne({
   //     phone: "2348148253812",
   //     profile: "9ad3df92-6512-4641-ab01-52af6b5a4c96",
   //   }),
@@ -23,11 +23,11 @@ const boots = async () => {
   // console.log(
   //   await (
   //     await db.collection("Profile_passwords")
-  //   ).insertOne({
+  //   ).deleteOne({
   //     profile: "f748c829-6451-4c3d-aa6e-f192ae1577a6",
-  //     key: hash("rushbaby"),
-  //     _id: crypto.randomUUID(),
-  //     created: Date.now(),
+  //     // key: hash("rushbaby"),
+  //     // _id: crypto.randomUUID(),
+  //     // created: Date.now(),
   //   }),
   // );
   // let V1_profiles = await PROFILES();

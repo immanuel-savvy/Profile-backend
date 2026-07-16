@@ -1,21 +1,56 @@
 {
-  "name": "backend",
+  "name": "Profiles",
   "version": "1.0.0",
-  "description": "",
-  "license": "ISC",
+  "description": "Authentication, Identity, API Key, Platform and Third-Party Authorization service for the Web4 ecosystem.",
+  "keywords": [
+    "web4",
+    "godprotocol",
+    "authentication",
+    "identity",
+    "oauth",
+    "api",
+    "api-keys",
+    "platform",
+    "profiles",
+    "authorization"
+  ],
+  "homepage": "https://github.com/immanuel-savvy/profile-backend#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/immanuel-savvy/profile-backend.git"
+  },
+  "bugs": {
+    "url": "https://github.com/immanuel-savvy/profile-backend/issues"
+  },
+  "license": "MIT",
   "author": "Savvy",
   "type": "module",
   "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "handlers/",
+    "services/",
+    "utils/",
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "start": "node index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "node --watch index.js",
+    "test": "echo \"No tests specified\""
   },
   "dependencies": {
-    "@godprotocol/repositories": "^1.1.27",
-    "crypto": "^1.0.1",
+    "@web4.0/identity": "^1.0.12",
     "dotenv": "^17.2.3",
-    "godprotocol": "^2.3.15",
-    "google-auth-library": "^10.5.0",
-    "twilio": "^5.13.1"
+    "godprotocol": "^2.3.27"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
