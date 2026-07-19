@@ -16,7 +16,7 @@ let gp = new GodProtocol({
   server: {
     domain: process.env.DEV
       ? "http://localhost:4000"
-      : "https://profiles-api.savvyaisolution.com",
+      : "https://profile-api.savvyaisolution.com",
   },
   capabilities: gp_services_config,
 });
