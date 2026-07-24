@@ -38,14 +38,14 @@
     "LICENSE"
   ],
   "scripts": {
-    "start": "node index.js",
+    "start": "node --import=dotenv/config index.js",
     "dev": "node --watch index.js",
     "test": "echo \"No tests specified\""
   },
   "dependencies": {
-    "@web4.0/identity": "^1.0.12",
+    "@web4.0/identity": "^1.0.15",
     "dotenv": "^17.2.3",
-    "godprotocol": "^2.3.27"
+    "godprotocol": "^2.3.35"
   },
   "engines": {
     "node": ">=20"

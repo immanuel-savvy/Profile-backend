@@ -6,6 +6,7 @@ import identity from "@web4.0/identity";
 
 import services_config, { gp_services_config } from "./services.config.js";
 
+console.log(services_config);
 let gp = new GodProtocol({
   platform_uri: process.env.PLATFORM_URI,
   api_key: process.env.API_KEY,
@@ -24,6 +25,7 @@ let gp = new GodProtocol({
 await identity.router(gp, { services_config });
 
 gp.on_start((gp) => {
+  // identity.boot(gp, { services_config });
   console.log(Object.keys(gp.route_table.versions));
 });
 
