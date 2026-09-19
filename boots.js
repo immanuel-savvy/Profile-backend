@@ -12,15 +12,7 @@ const boots = async () => {
   //   db_name: "v3-profiles",
   // });
 
-  // let Profiles = await db.collection("Profile_passwords");
-  // console.log(
-  //   await Profiles.insertOne({
-  //     key: hash("123456"),
-  //     _id: crypto.randomUUID(),
-  //     created: Date.now(),
-  //     profile: "afd86bb6-8261-4b8a-88ba-ada35757250a",
-  //   }),
-  // );
+  // let Profiles = await db.collection("Profiles");
 
   return;
 
