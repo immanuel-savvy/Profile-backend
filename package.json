@@ -43,7 +43,7 @@
     "test": "echo \"No tests specified\""
   },
   "dependencies": {
-    "@web4.0/identity": "^1.0.40",
+    "@web4.0/identity": "^1.0.42",
     "dotenv": "^17.2.3",
     "godprotocol": "^2.3.87"
   },
