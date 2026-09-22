@@ -43,10 +43,10 @@
     "test": "echo \"No tests specified\""
   },
   "dependencies": {
-    "@web4.0/identity": "^1.0.34",
+    "@web4.0/identity": "^1.0.37",
     "apple-signin-auth": "^2.1.0",
     "dotenv": "^17.2.3",
-    "godprotocol": "^2.3.78"
+    "godprotocol": "^2.3.87"
   },
   "engines": {
     "node": ">=20"
