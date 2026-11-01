@@ -45,7 +45,7 @@
   "dependencies": {
     "@web4.0/identity": "^1.0.62",
     "dotenv": "^17.2.3",
-    "godprotocol": "^2.5.1"
+    "godprotocol": "^2.5.3"
   },
   "engines": {
     "node": ">=20"
