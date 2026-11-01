@@ -6,26 +6,19 @@ const services_config = {
     api_key: process.env.API_KEY,
   },
   aimail: {
-    uri: "aimail.savvyaisolution.com",
     url: process.env.DEV
       ? "http://localhost:4003"
       : "https://email-api.savvyaisolution.com",
+    uri: "aimail.savvyaisolution.com",
+    profile_key: process.env.AIMAIL_PROFILE_KEY,
   },
   settings: {
     uri: "settings.savvyaisolution.com",
     url: process.env.DEV
       ? "http://localhost:4005"
       : "https://settings-api.savvyaisolution.com",
-  },
-};
-
-const gp_services_config = {
-  identity: {
-    local: "identity",
-    uri: "profiles.savvyaisolution.com",
-    api_key: process.env.API_KEY,
+    profile_key: process.env.SETTINGS_PROFILE_KEY,
   },
 };
 
 export default services_config;
-export { gp_services_config };

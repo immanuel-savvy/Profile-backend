@@ -4,7 +4,7 @@ dotenv.config();
 import GodProtocol from "godprotocol";
 import identity from "@web4.0/identity";
 
-import services_config, { gp_services_config } from "./services.config.js";
+import services_config from "./services.config.js";
 
 let gp = new GodProtocol({
   platform_uri: process.env.PLATFORM_URI,
@@ -18,13 +18,13 @@ let gp = new GodProtocol({
       ? "http://localhost:4000"
       : "https://profile-api.savvyaisolution.com",
   },
-  capabilities: gp_services_config,
+  services_config,
 });
 
-await identity.router(gp, { services_config });
+await identity.router(gp);
 
-gp.on_start((gp) => {});
+identity.start(gp);
 
-gp.boot();
+gp.boot(null, { skip: !process.env.DEV || true });
 
 export default gp.on_request;

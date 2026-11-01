@@ -43,9 +43,9 @@
     "test": "echo \"No tests specified\""
   },
   "dependencies": {
-    "@web4.0/identity": "^1.0.54",
+    "@web4.0/identity": "^1.0.62",
     "dotenv": "^17.2.3",
-    "godprotocol": "^2.4.10"
+    "godprotocol": "^2.5.1"
   },
   "engines": {
     "node": ">=20"
