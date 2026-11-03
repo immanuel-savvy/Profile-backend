@@ -1,7 +1,6 @@
 const services_config = {
   identity: {
     local: "..",
-    alias: ["identity"],
     uri: "profiles.savvyaisolution.com",
     api_key: process.env.API_KEY,
   },
